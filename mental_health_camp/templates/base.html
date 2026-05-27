@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xl font-bold text-gray-900">{{ APP_NAME }}</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    {% if user %}
+                        {% if user.role == 'admin' %}
+                            <a href="/admin/dashboard" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">数据看板</a>
+                            <a href="/admin/bootcamps" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">训练营管理</a>
+                            <a href="/admin/users" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">用户管理</a>
+                            <a href="/admin/export" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">数据导出</a>
+                            <a href="/admin/audit" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">操作日志</a>
+                        {% else %}
+                            <a href="/user/today" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">今日任务</a>
+                            <a href="/user/progress" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">我的进度</a>
+                            <a href="/user/badges" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">成就徽章</a>
+                            <a href="/user/profile" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">个人信息</a>
+                        {% endif %}
+                        <div class="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-200">
+                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <span class="text-sm font-medium text-indigo-600">{{ user.nickname[0] }}</span>
+                            </div>
+                            <span class="text-sm text-gray-700">{{ user.nickname }}</span>
+                            <a href="/logout" class="text-gray-400 hover:text-red-500 ml-2" title="退出">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                </svg>
+                            </a>
+                        </div>
+                    {% else %}
+                        <a href="/login" class="text-gray-600 hover:text-indigo-600 px-3 py-2 text-sm font-medium">登录</a>
+                        <a href="/register" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">注册</a>
+                    {% endif %}
+                    <button id="mobile-menu-btn" class="md:hidden text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100">
+            <div class="px-4 py-2 space-y-1">
+                {% if user %}
+                    {% if user.role == 'admin' %}
+                        <a href="/admin/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">数据看板</a>
+                        <a href="/admin/bootcamps" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">训练营管理</a>
+                        <a href="/admin/users" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">用户管理</a>
+                        <a href="/admin/export" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">数据导出</a>
+                        <a href="/admin/audit" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">操作日志</a>
+                    {% else %}
+                        <a href="/user/today" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">今日任务</a>
+                        <a href="/user/progress" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">我的进度</a>
+                        <a href="/user/badges" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">成就徽章</a>
+                        <a href="/user/profile" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">个人信息</a>
+                    {% endif %}
+                    <a href="/logout" class="block px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-red-50">退出登录</a>
+                {% else %}
+                    <a href="/login" class="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-indigo-600 hover:bg-indigo-50">登录</a>
+                    <a href="/register" class="block px-3 py-2 rounded-md text-base font-medium text-indigo-600 hover:bg-indigo-50">注册</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>

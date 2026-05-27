@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}历史记录 - {{ bootcamp.name }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="fade-in">
+    <div class="mb-6">
+        <a href="/user/progress" class="inline-flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            返回我的进度
+        </a>
+    </div>
+
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">{{ bootcamp.name }}</h1>
+        <p class="text-gray-500 mt-1">历史提交记录</p>
+    </div>
+
+    {% if records %}
+    <div class="relative">
+        <div class="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        <div class="space-y-6">
+            {% for record in records %}
+            <div class="relative pl-12">
+                <div class="absolute left-3 top-1 w-5 h-5 rounded-full bg-indigo-600 border-4 border-white shadow-sm z-10"></div>
+                <div class="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-700">
+                                第 {{ record.submission.day_number }} 天
+                            </span>
+                        </div>
+                        <span class="text-sm text-gray-400">{{ record.submission.submitted_at.strftime('%Y-%m-%d %H:%M') if record.submission.submitted_at else '' }}</span>
+                    </div>
+
+                    {% if record.day_form %}
+                    <div class="space-y-4">
+                        {% for q in record.day_form.questions %}
+                        <div class="border-l-2 border-gray-100 pl-4">
+                            <p class="text-sm font-medium text-gray-500 mb-1">{{ q.label }}</p>
+                            {% set answer = record.submission.answers[q.id] if record.submission.answers[q.id] is defined else None %}
+                            {% if q.type == "text" %}
+                            <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ answer if answer else '未作答' }}</p>
+                            {% elif q.type == "single" %}
+                            <p class="text-sm text-gray-800">{{ answer if answer else '未作答' }}</p>
+                            {% elif q.type == "multiple" %}
+                            <p class="text-sm text-gray-800">{{ answer | join('、') if answer else '未作答' }}</p>
+                            {% elif q.type == "likert" %}
+                            {% if answer %}
+                            {% set likert_labels = q.labels if q.labels is defined else [] %}
+                            <div class="flex items-center space-x-2">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-medium">{{ answer }}</span>
+                                {% if likert_labels and likert_labels[answer - 1] %}
+                                <span class="text-sm text-gray-600">{{ likert_labels[answer - 1] }}</span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <p class="text-sm text-gray-800">未作答</p>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-400">表单数据不可用</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">暂无提交记录</h3>
+        <p class="text-gray-500 text-sm">还没有提交过任何表单</p>
+        <a href="/user/today" class="inline-flex items-center mt-6 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+            去填写今日任务
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

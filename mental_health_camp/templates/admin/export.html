@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}数据导出 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">数据导出</h1>
+        <p class="text-gray-500 mt-1">选择训练营并导出用户提交数据</p>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm p-8">
+        <form method="POST" action="/admin/export" class="space-y-5">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">选择训练营</label>
+                {% if bootcamps %}
+                <select name="bootcamp_id" id="export_bootcamp" required onchange="loadBatchOptions()" class="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors bg-white">
+                    {% for b in bootcamps %}
+                    <option value="{{ b.id }}" data-batches='{{ b.batch_list | tojson }}' {% if selected_bootcamp == b.id %}selected{% endif %}>{{ b.name }} ({{ b.days }}天)</option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <p class="text-gray-500">暂无训练营可导出</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">选择批次（可选）</label>
+                <select name="batch_id" id="export_batch" class="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors bg-white">
+                    <option value="">全部批次</option>
+                </select>
+            </div>
+            {% if bootcamps %}
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors inline-flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>导出CSV</span>
+            </button>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if data is not none %}
+    <div class="bg-white rounded-2xl shadow-sm p-8">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">导出结果</h2>
+        <p class="text-gray-500">CSV文件已生成并开始下载。</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function loadBatchOptions() {
+    var sel = document.getElementById('export_bootcamp');
+    var batchSel = document.getElementById('export_batch');
+    if (!sel || !batchSel) return;
+    var opt = sel.options[sel.selectedIndex];
+    var batches = [];
+    try { batches = JSON.parse(opt.getAttribute('data-batches') || '[]'); } catch(e) { batches = []; }
+    batchSel.innerHTML = '<option value="">全部批次</option>';
+    for (var i = 0; i < batches.length; i++) {
+        var o = document.createElement('option');
+        o.value = batches[i].id;
+        o.textContent = batches[i].name;
+        batchSel.appendChild(o);
+    }
+}
+document.addEventListener('DOMContentLoaded', loadBatchOptions);
+</script>
+{% endblock %}

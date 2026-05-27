@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}
+{% if show_profile %}个人信息 - {{ APP_NAME }}
+{% elif show_all %}我的进度 - {{ APP_NAME }}
+{% else %}仪表板 - {{ APP_NAME }}{% endif %}
+{% endblock %}
+{% block content %}
+<div class="fade-in">
+    {% if show_profile %}
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">个人信息</h1>
+        <p class="text-gray-500 mt-1">管理你的账户信息</p>
+    </div>
+
+    {% if pwd_error %}
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm flex items-center">
+        <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        {{ pwd_error }}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm p-6">
+            <div class="flex items-center space-x-3 mb-6">
+                <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <span class="text-xl font-bold text-indigo-600">{{ user.nickname[0] }}</span>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ user.nickname }}</h2>
+                    <p class="text-sm text-gray-500">{{ user.email }}</p>
+                </div>
+            </div>
+
+            <form method="POST" action="/user/profile" class="space-y-4">
+                <div>
+                    <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+                    <input type="text" id="nickname" name="nickname" value="{{ user.nickname }}" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+                    <input type="email" value="{{ user.email }}" disabled
+                        class="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 text-sm cursor-not-allowed">
+                    <p class="text-xs text-gray-400 mt-1">邮箱不可修改</p>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors text-sm">
+                    保存修改
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-6">修改密码</h2>
+            <form method="POST" action="/user/password" class="space-y-4">
+                <div>
+                    <label for="current_password" class="block text-sm font-medium text-gray-700 mb-1">当前密码</label>
+                    <input type="password" id="current_password" name="current_password" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-sm"
+                        placeholder="请输入当前密码">
+                </div>
+                <div>
+                    <label for="new_password" class="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                    <input type="password" id="new_password" name="new_password" required minlength="6"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-sm"
+                        placeholder="至少6位">
+                </div>
+                <button type="submit" class="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 rounded-lg font-medium transition-colors text-sm">
+                    修改密码
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-6 md:col-span-2">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">通知设置</h2>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div>
+                    <p class="text-sm font-medium text-gray-700">每日邮件提醒</p>
+                    <p class="text-xs text-gray-500 mt-0.5">在未完成当日表单时接收提醒邮件</p>
+                </div>
+                <form method="POST" action="/user/notification-toggle">
+                    <button type="submit" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 {% if user.notification_enabled %}bg-indigo-600{% else %}bg-gray-200{% endif %}">
+                        <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {% if user.notification_enabled %}translate-x-5{% else %}translate-x-0{% endif %}"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">{% if show_all %}我的进度{% else %}我的训练营{% endif %}</h1>
+        <p class="text-gray-500 mt-1">{% if show_all %}查看所有参与训练营的完成情况{% else %}你参与的训练营概览{% endif %}</p>
+    </div>
+
+    {% if bootcamp_data %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for item in bootcamp_data %}
+        <div class="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-4">
+                <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <span class="text-xs text-gray-400">开始于 {{ item.enrollment.start_date.strftime('%Y-%m-%d') }}</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ item.bootcamp.name }}</h3>
+            <p class="text-sm text-gray-500 mb-4 line-clamp-2">{{ item.bootcamp.description if item.bootcamp.description else '暂无描述' }}</p>
+            <div class="mb-2">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs text-gray-500">{{ item.completed }} / {{ item.bootcamp.days }} 天</span>
+                    <span class="text-xs font-medium text-indigo-600">{{ item.percentage }}%</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: {{ item.percentage }}%"></div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 mt-4">
+                <a href="/user/history/{{ item.enrollment.id }}" class="flex-1 text-center text-sm font-medium text-indigo-600 hover:bg-indigo-50 py-2 rounded-lg transition-colors">查看历史</a>
+                <button onclick="toggleDashboard({{ item.enrollment.id }})" class="flex-1 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 py-2 rounded-lg transition-colors">仪表盘</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% for item in bootcamp_data %}
+    <div id="dashboard-panel-{{ item.enrollment.id }}" class="hidden mt-6 bg-white rounded-2xl shadow-sm p-8 fade-in">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div id="streak-{{ item.enrollment.id }}" class="bg-gradient-to-br from-orange-50 to-white rounded-xl p-6 border border-orange-100"></div>
+            <div class="md:col-span-2 bg-gray-50 rounded-xl p-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">日历热力图</h4>
+                <div id="calendar-{{ item.enrollment.id }}"></div>
+            </div>
+        </div>
+        <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Likert量表趋势</h4>
+            <div class="bg-gray-50 rounded-xl p-6" style="height: 250px;">
+                <canvas id="chart-{{ item.enrollment.id }}"></canvas>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script>
+        function toggleDashboard(enrollmentId) {
+            var panel = document.getElementById('dashboard-panel-' + enrollmentId);
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                loadDashboardData(enrollmentId);
+            } else {
+                panel.classList.add('hidden');
+            }
+        }
+        function loadDashboardData(enrollmentId) {
+            fetch('/user/api/dashboard-data/' + enrollmentId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    renderCalendarHeatmap(document.getElementById('calendar-' + enrollmentId), data.calendar);
+                    renderStreakCounter(document.getElementById('streak-' + enrollmentId), data.streak);
+                    if (Object.keys(data.likert_series).length > 0) {
+                        initLikertChart('chart-' + enrollmentId, data.likert_series);
+                    } else {
+                        document.getElementById('chart-' + enrollmentId).parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400 text-sm">暂无量表数据</div>';
+                    }
+                });
+        }
+    </script>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">暂无训练营</h3>
+        <p class="text-gray-500 text-sm">你还没有加入任何训练营</p>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

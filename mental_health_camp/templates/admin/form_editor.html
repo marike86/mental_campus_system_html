@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}{% if day %}第{{ day }}天表单 - {% elif bootcamp %}{{ bootcamp.name }} - {% else %}创建训练营 - {% endif %}{{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+
+    {% if bootcamp is none and day is none %}
+    <div class="max-w-2xl mx-auto">
+        <div class="mb-6">
+            <a href="/admin/bootcamps" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span>返回列表</span>
+            </a>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm p-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-6">创建新训练营</h2>
+            <form method="POST" action="/admin/bootcamp/new" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">训练营名称</label>
+                    <input type="text" name="name" required placeholder="例如：21天情绪管理训练营"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea name="description" rows="3" placeholder="简要描述训练营的目标和内容"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">训练天数</label>
+                    <input type="number" name="days" value="7" min="1" max="365" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                </div>
+                <div class="flex items-center space-x-3 pt-2">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">创建训练营</button>
+                    <a href="/admin/bootcamps" class="text-gray-500 hover:text-gray-700 px-4 py-2.5 font-medium transition-colors">取消</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% elif bootcamp and day is none %}
+    <div class="max-w-3xl mx-auto space-y-6">
+        <div class="mb-2">
+            <a href="/admin/bootcamps" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span>返回列表</span>
+            </a>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-900">训练营信息</h2>
+                {% if bootcamp.is_active %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">已发布</span>
+                {% else %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-500">未发布</span>
+                {% endif %}
+            </div>
+            <form method="POST" action="/admin/bootcamp/{{ bootcamp.id }}" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">训练营名称</label>
+                    <input type="text" name="name" value="{{ bootcamp.name }}" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea name="description" rows="3"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none">{{ bootcamp.description }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">训练天数</label>
+                    <div class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">{{ bootcamp.days }} 天</div>
+                </div>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">保存修改</button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-8">
+            <h2 class="text-xl font-bold text-gray-900 mb-6">每日表单配置</h2>
+            {% if day_forms %}
+            <div class="space-y-3">
+                {% for df in day_forms %}
+                <div class="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                            <span class="text-indigo-600 font-bold text-sm">{{ df.day_number }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-900">第 {{ df.day_number }} 天</span>
+                            <p class="text-sm text-gray-500">
+                                {% if df.questions and df.questions | length > 0 %}
+                                已配置 {{ df.questions | length }} 道题目
+                                {% else %}
+                                尚未配置题目
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <a href="/admin/bootcamp/{{ bootcamp.id }}/day/{{ df.day_number }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-white transition-colors">
+                        编辑题目
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">暂无表单配置</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% elif bootcamp and day %}
+    <div class="max-w-3xl mx-auto space-y-6">
+        <div class="mb-2">
+            <a href="/admin/bootcamp/{{ bootcamp.id }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <span>返回 {{ bootcamp.name }}</span>
+            </a>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-900">第 {{ day }} 天 - 表单题目编辑</h2>
+                <span class="text-sm text-gray-500">{{ bootcamp.name }}</span>
+            </div>
+
+            <form method="POST" action="/admin/bootcamp/{{ bootcamp.id }}/day/{{ day }}" id="questionForm">
+                <input type="hidden" name="questions" id="questionsInput" value="{{ questions_json }}">
+
+                <div id="questionList" class="space-y-4"></div>
+
+                <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <div class="relative" id="addTypeDropdown">
+                        <button type="button" onclick="toggleAddMenu()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2.5 rounded-lg font-medium transition-colors inline-flex items-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            <span>添加题目</span>
+                        </button>
+                        <div id="addMenu" class="hidden absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                            <button type="button" onclick="addQuestion('text')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-t-xl transition-colors">文本框</button>
+                            <button type="button" onclick="addQuestion('single')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">单选题</button>
+                            <button type="button" onclick="addQuestion('multiple')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">多选题</button>
+                            <button type="button" onclick="addQuestion('likert')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-b-xl transition-colors">Likert量表</button>
+                        </div>
+                    </div>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">保存题目</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+(function() {
+    var typeLabels = {text: '文本框', single: '单选题', multiple: '多选题', likert: 'Likert量表'};
+    var questions = [];
+
+    var raw = document.getElementById('questionsInput');
+    if (raw && raw.value) {
+        try { questions = JSON.parse(raw.value); } catch(e) { questions = []; }
+    }
+
+    var questionCounter = 0;
+
+    function generateId() {
+        questionCounter++;
+        return 'q' + Date.now().toString(36) + '_' + questionCounter + '_' + Math.random().toString(36).substr(2, 6);
+    }
+
+    window.toggleAddMenu = function() {
+        document.getElementById('addMenu').classList.toggle('hidden');
+    };
+
+    window.addQuestion = function(type) {
+        var q = {id: generateId(), type: type, label: '', condition: null};
+        if (type === 'single' || type === 'multiple') {
+            q.options = ['选项1', '选项2'];
+        }
+        if (type === 'likert') {
+            q.min = 1;
+            q.max = 5;
+            q.labels = ['完全不', '轻微', '中等', '明显', '严重'];
+        }
+        questions.push(q);
+        renderQuestions();
+        document.getElementById('addMenu').classList.add('hidden');
+    };
+
+    window.removeQuestion = function(idx) {
+        questions.splice(idx, 1);
+        renderQuestions();
+    };
+
+    window.moveQuestion = function(idx, dir) {
+        var target = idx + dir;
+        if (target < 0 || target >= questions.length) return;
+        var temp = questions[idx];
+        questions[idx] = questions[target];
+        questions[target] = temp;
+        renderQuestions();
+    };
+
+    window.updateLabel = function(idx, value) {
+        questions[idx].label = value;
+    };
+
+    window.updateOption = function(qIdx, oIdx, value) {
+        questions[qIdx].options[oIdx] = value;
+    };
+
+    window.addOption = function(qIdx) {
+        questions[qIdx].options.push('新选项');
+        renderQuestions();
+    };
+
+    window.removeOption = function(qIdx, oIdx) {
+        questions[qIdx].options.splice(oIdx, 1);
+        renderQuestions();
+    };
+
+    function renderQuestions() {
+        var container = document.getElementById('questionList');
+        if (!container) return;
+        if (questions.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400"><p>暂无题目，点击下方"添加题目"开始配置</p></div>';
+            syncInput();
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < questions.length; i++) {
+            var q = questions[i];
+            html += '<div class="border border-gray-200 rounded-xl overflow-hidden">';
+            html += '<div class="flex items-center justify-between px-5 py-4 bg-gray-50">';
+            html += '<div class="flex items-center space-x-3">';
+            html += '<span class="text-gray-400 text-sm font-mono">#' + (i + 1) + '</span>';
+            html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">' + typeLabels[q.type] + '</span>';
+            html += '</div>';
+            html += '<div class="flex items-center space-x-1">';
+            if (i > 0) html += '<button type="button" onclick="moveQuestion(' + i + ',-1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors" title="上移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg></button>';
+            if (i < questions.length - 1) html += '<button type="button" onclick="moveQuestion(' + i + ',1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors" title="下移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>';
+            html += '<button type="button" onclick="removeQuestion(' + i + ')" class="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="删除"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>';
+            html += '</div></div>';
+            html += '<div class="px-5 py-4 space-y-4">';
+            html += '<div>';
+            html += '<label class="block text-sm font-medium text-gray-600 mb-1">题目标签</label>';
+            html += '<input type="text" value="' + escHtml(q.label) + '" oninput="updateLabel(' + i + ',this.value)" placeholder="例如：今天心情如何？" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-colors">';
+            html += '</div>';
+            if (q.type === 'single' || q.type === 'multiple') {
+                html += '<div>';
+                html += '<label class="block text-sm font-medium text-gray-600 mb-2">选项</label>';
+                html += '<div class="space-y-2">';
+                for (var j = 0; j < (q.options || []).length; j++) {
+                    html += '<div class="flex items-center space-x-2">';
+                    if (q.type === 'single') {
+                        html += '<div class="w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0"></div>';
+                    } else {
+                        html += '<div class="w-4 h-4 rounded border-2 border-gray-300 flex-shrink-0"></div>';
+                    }
+                    html += '<input type="text" value="' + escHtml(q.options[j]) + '" oninput="updateOption(' + i + ',' + j + ',this.value)" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-colors">';
+                    html += '<button type="button" onclick="removeOption(' + i + ',' + j + ')" class="p-1 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+                    html += '</div>';
+                }
+                html += '</div>';
+                html += '<button type="button" onclick="addOption(' + i + ')" class="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium inline-flex items-center space-x-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>添加选项</span></button>';
+                html += '</div>';
+            }
+            if (q.type === 'likert') {
+                html += '<div class="bg-gray-50 rounded-lg p-4">';
+                html += '<p class="text-sm text-gray-500 mb-2">Likert量表（1-5），默认标签：完全不 / 轻微 / 中等 / 明显 / 严重</p>';
+                html += '<div class="flex items-center space-x-4">';
+                for (var k = 1; k <= 5; k++) {
+                    html += '<div class="text-center"><div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-1"><span class="text-indigo-600 font-bold text-sm">' + k + '</span></div><span class="text-xs text-gray-500">' + (q.labels && q.labels[k-1] ? q.labels[k-1] : '') + '</span></div>';
+                }
+                html += '</div></div>';
+            }
+            html += renderConditionHtml(i);
+            html += '</div></div>';
+        }
+        container.innerHTML = html;
+        syncInput();
+    }
+
+    function renderConditionHtml(i) {
+        var q = questions[i];
+        var cond = q.condition || null;
+        var condHtml = '<div class="border-t border-gray-100 pt-3 mt-3">';
+        condHtml += '<div class="flex items-center justify-between mb-2">';
+        condHtml += '<label class="text-sm font-medium text-gray-600">显示条件</label>';
+        condHtml += '<button type="button" onclick="toggleCondition(' + i + ')" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">';
+        condHtml += cond ? '编辑条件' : '设置条件';
+        condHtml += '</button></div>';
+        if (cond) {
+            var condQuestion = null;
+            for (var ci = 0; ci < questions.length; ci++) {
+                if (questions[ci].id === cond.question_id) { condQuestion = questions[ci]; break; }
+            }
+            condHtml += '<div class="bg-yellow-50 rounded-lg p-2 text-xs text-yellow-700 flex items-center justify-between">';
+            condHtml += '<span>当「' + (condQuestion ? condQuestion.label || cond.question_id : cond.question_id) + '」';
+            condHtml += ' ' + (cond.operator === 'equals' ? '等于' : cond.operator === 'not_equals' ? '不等于' : '包含');
+            condHtml += ' 「' + (cond.value || '') + '」 时显示</span>';
+            condHtml += '<button type="button" onclick="removeCondition(' + i + ')" class="text-red-400 hover:text-red-600 ml-2">✕</button>';
+            condHtml += '</div>';
+        }
+        condHtml += '</div>';
+        return condHtml;
+    }
+
+    window.toggleCondition = function(idx) {
+        var q = questions[idx];
+        var otherQuestions = [];
+        for (var j = 0; j < questions.length; j++) {
+            if (j !== idx && questions[j].type === 'single') {
+                otherQuestions.push(questions[j]);
+            }
+        }
+        if (otherQuestions.length === 0) {
+            alert('至少需要一个单选题作为条件题');
+            return;
+        }
+        var cond = q.condition || {};
+        var qid = cond.question_id || otherQuestions[0].id;
+        var op = cond.operator || 'equals';
+        var val = cond.value || (otherQuestions[0].options && otherQuestions[0].options[0]) || '';
+        var selectedQ = null;
+        for (var k = 0; k < otherQuestions.length; k++) {
+            if (otherQuestions[k].id === qid) { selectedQ = otherQuestions[k]; break; }
+        }
+        if (!selectedQ) selectedQ = otherQuestions[0];
+        var optionsHtml = '';
+        for (var m = 0; m < selectedQ.options.length; m++) {
+            optionsHtml += '<option value="' + escHtml(selectedQ.options[m]) + '"' + (selectedQ.options[m] === val ? ' selected' : '') + '>' + escHtml(selectedQ.options[m]) + '</option>';
+        }
+        var questionOptionsHtml = '';
+        for (var n = 0; n < otherQuestions.length; n++) {
+            questionOptionsHtml += '<option value="' + otherQuestions[n].id + '"' + (otherQuestions[n].id === qid ? ' selected' : '') + '>' + escHtml(otherQuestions[n].label || otherQuestions[n].id) + '</option>';
+        }
+        var modalHtml = '<div id="conditionModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">';
+        modalHtml += '<div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">';
+        modalHtml += '<h3 class="text-lg font-bold text-gray-900 mb-4">设置显示条件</h3>';
+        modalHtml += '<div class="space-y-4">';
+        modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">当题目</label>';
+        modalHtml += '<select id="condQuestion" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="updateCondOptions()">' + questionOptionsHtml + '</select></div>';
+        modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">运算符</label>';
+        modalHtml += '<select id="condOperator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">';
+        modalHtml += '<option value="equals"' + (op === 'equals' ? ' selected' : '') + '>等于</option>';
+        modalHtml += '<option value="not_equals"' + (op === 'not_equals' ? ' selected' : '') + '>不等于</option>';
+        modalHtml += '<option value="includes"' + (op === 'includes' ? ' selected' : '') + '>包含</option>';
+        modalHtml += '</select></div>';
+        modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">值</label>';
+        modalHtml += '<select id="condValue" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">' + optionsHtml + '</select></div>';
+        modalHtml += '</div>';
+        modalHtml += '<div class="flex items-center justify-end space-x-3 mt-6">';
+        modalHtml += '<button onclick="closeConditionModal()" class="text-gray-500 hover:text-gray-700 px-4 py-2 text-sm font-medium">取消</button>';
+        modalHtml += '<button onclick="saveCondition(' + idx + ')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">保存</button>';
+        modalHtml += '</div></div></div>';
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        window._condOtherQuestions = otherQuestions;
+    };
+
+    window.updateCondOptions = function() {
+        var qid = document.getElementById('condQuestion').value;
+        var questions2 = window._condOtherQuestions || [];
+        var selectedQ = null;
+        for (var i = 0; i < questions2.length; i++) {
+            if (questions2[i].id === qid) { selectedQ = questions2[i]; break; }
+        }
+        if (!selectedQ) return;
+        var sel = document.getElementById('condValue');
+        sel.innerHTML = '';
+        for (var j = 0; j < selectedQ.options.length; j++) {
+            var opt = document.createElement('option');
+            opt.value = selectedQ.options[j];
+            opt.textContent = selectedQ.options[j];
+            sel.appendChild(opt);
+        }
+    };
+
+    window.saveCondition = function(idx) {
+        questions[idx].condition = {
+            question_id: document.getElementById('condQuestion').value,
+            operator: document.getElementById('condOperator').value,
+            value: document.getElementById('condValue').value
+        };
+        closeConditionModal();
+        renderQuestions();
+    };
+
+    window.removeCondition = function(idx) {
+        questions[idx].condition = null;
+        renderQuestions();
+    };
+
+    window.closeConditionModal = function() {
+        var modal = document.getElementById('conditionModal');
+        if (modal) modal.remove();
+    };
+
+    function syncInput() {
+        var input = document.getElementById('questionsInput');
+        if (input) input.value = JSON.stringify(questions);
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.addEventListener('click', function(e) {
+        var dropdown = document.getElementById('addTypeDropdown');
+        var menu = document.getElementById('addMenu');
+        if (dropdown && menu && !dropdown.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
+
+    var form = document.getElementById('questionForm');
+    if (form) {
+        form.addEventListener('submit', function() {
+            syncInput();
+        });
+    }
+
+    renderQuestions();
+})();
+</script>
+{% endblock %}

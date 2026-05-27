@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}用户管理 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">用户管理</h1>
+        <p class="text-gray-500 mt-1">查看用户列表并分配训练营</p>
+    </div>
+
+    {% if not users %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-1">暂无注册用户</h3>
+        <p class="text-gray-500">等待用户注册后可在此管理</p>
+    </div>
+    {% else %}
+
+    <div class="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-100">
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">昵称</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">邮箱</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">注册时间</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">已分配训练营</th>
+                    <th class="text-right px-6 py-4 text-sm font-medium text-gray-500">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+                {% for u in users %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-sm font-medium text-indigo-600">{{ u.nickname[0] }}</span>
+                            </div>
+                            <span class="font-medium text-gray-900">{{ u.nickname }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-gray-500 text-sm">{{ u.email }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-gray-500 text-sm">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap gap-1.5">
+                            {% if u.id in enrollment_map %}
+                                {% for eid in enrollment_map[u.id] %}
+                                {% for b in bootcamps %}
+                                    {% if b.id == eid %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">{{ b.name }}</span>
+                                    {% endif %}
+                                {% endfor %}
+                                {% endfor %}
+                            {% else %}
+                            <span class="text-gray-400 text-sm">—</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <form method="POST" action="/admin/enroll" class="flex items-center justify-end space-x-2">
+                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                            <select name="bootcamp_id" required onchange="updateBatchSelect(this)" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                                {% for b in bootcamps %}
+                                <option value="{{ b.id }}">{{ b.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="batch_id" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white batch-select">
+                                <option value="">无批次</option>
+                            </select>
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded-lg font-medium transition-colors">分配</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="md:hidden space-y-4">
+        {% for u in users %}
+        <div class="bg-white rounded-2xl shadow-sm p-5">
+            <div class="flex items-center space-x-3 mb-3">
+                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-sm font-medium text-indigo-600">{{ u.nickname[0] }}</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-gray-900">{{ u.nickname }}</h3>
+                    <p class="text-sm text-gray-500">{{ u.email }}</p>
+                </div>
+            </div>
+            {% if u.id in enrollment_map %}
+            <div class="flex flex-wrap gap-1.5 mb-4">
+                {% for eid in enrollment_map[u.id] %}
+                {% for b in bootcamps %}
+                    {% if b.id == eid %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">{{ b.name }}</span>
+                    {% endif %}
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form method="POST" action="/admin/enroll" class="flex items-center space-x-2">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <select name="bootcamp_id" required onchange="updateBatchSelect(this)" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
+                    {% for b in bootcamps %}
+                    <option value="{{ b.id }}">{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="batch_id" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white batch-select">
+                    <option value="">无批次</option>
+                </select>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors flex-shrink-0">分配</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% endif %}
+</div>
+
+<script>
+var bootcampBatches = {{ bootcamp_batches | tojson }};
+
+function updateBatchSelect(bootcampSelect) {
+    var form = bootcampSelect.closest('form');
+    var batchSelect = form.querySelector('.batch-select');
+    var bootcampId = bootcampSelect.value;
+    var batches = bootcampBatches[bootcampId] || [];
+    
+    batchSelect.innerHTML = '<option value="">无批次</option>';
+    for (var i = 0; i < batches.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = batches[i].id;
+        opt.textContent = batches[i].name;
+        batchSelect.appendChild(opt);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var bootcampSelects = document.querySelectorAll('select[name="bootcamp_id"]');
+    bootcampSelects.forEach(function(sel) {
+        updateBatchSelect(sel);
+    });
+});
+</script>
+{% endblock %}

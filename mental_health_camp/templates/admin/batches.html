@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}批次管理 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">批次管理</h1>
+            <p class="text-gray-500 mt-1">管理训练营的分批信息</p>
+        </div>
+    </div>
+
+    {% for bootcamp in bootcamps %}
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">{{ bootcamp.name }}</h2>
+                <p class="text-sm text-gray-500">{{ bootcamp.days }}天训练营</p>
+            </div>
+            <button onclick="showAddBatch({{ bootcamp.id }})" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span>新增批次</span>
+            </button>
+        </div>
+
+        <div id="add-batch-form-{{ bootcamp.id }}" class="hidden px-6 py-4 bg-indigo-50 border-b border-indigo-100">
+            <form method="POST" action="/admin/batch/new" class="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="bootcamp_id" value="{{ bootcamp.id }}">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">批次名称</label>
+                    <input type="text" name="name" required placeholder="例如：2026年5月期"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+                    <input type="date" name="start_date"
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">结束日期</label>
+                    <input type="date" name="end_date"
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-white">
+                </div>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">创建</button>
+                <button type="button" onclick="hideAddBatch({{ bootcamp.id }})" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">取消</button>
+            </form>
+        </div>
+
+        {% if bootcamp.batches %}
+        <div class="divide-y divide-gray-50">
+            {% for batch in bootcamp.batches %}
+            <div class="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <span class="text-indigo-600 font-bold text-sm">{{ batch['name'][:1] }}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-900">{{ batch['name'] }}</span>
+                        <p class="text-sm text-gray-500">
+                            {% if batch['start_date'] %}{{ batch['start_date'].strftime('%Y-%m-%d') }}{% else %}未设定{% endif %}
+                            ~
+                            {% if batch['end_date'] %}{{ batch['end_date'].strftime('%Y-%m-%d') }}{% else %}未设定{% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    {% if batch['is_active'] %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">进行中</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">已结束</span>
+                    {% endif %}
+                    <span class="text-sm text-gray-500">{{ batch['user_count'] }}人</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-400 text-sm">暂无批次</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not bootcamps %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">暂无训练营</h3>
+        <p class="text-gray-500 text-sm">请先创建训练营</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function showAddBatch(id) {
+    document.getElementById('add-batch-form-' + id).classList.remove('hidden');
+}
+function hideAddBatch(id) {
+    document.getElementById('add-batch-form-' + id).classList.add('hidden');
+}
+</script>
+{% endblock %}

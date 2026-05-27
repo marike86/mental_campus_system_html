@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}操作日志 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">操作日志</h1>
+        <p class="text-gray-500 mt-1">管理员操作记录（共 {{ total }} 条）</p>
+    </div>
+
+    {% if logs %}
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">时间</th>
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">管理员</th>
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">操作</th>
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">对象类型</th>
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">对象ID</th>
+                        <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">详情</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for log in logs %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                            {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-sm font-medium text-gray-900">{{ admin_map.get(log.admin_id, '未知') }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if '查看' in log.action %}bg-blue-100 text-blue-700
+                                {% elif '导出' in log.action %}bg-orange-100 text-orange-700
+                                {% elif '创建' in log.action %}bg-green-100 text-green-700
+                                {% elif '修改' in log.action %}bg-yellow-100 text-yellow-700
+                                {% elif '分配' in log.action %}bg-purple-100 text-purple-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ log.target_type }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ log.target_id if log.target_id else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                            {% if log.detail %}
+                            {{ log.detail | tojson }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="md:hidden divide-y divide-gray-50">
+            {% for log in logs %}
+            <div class="px-4 py-3">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-medium text-gray-900">{{ log.action }}</span>
+                    <span class="text-xs text-gray-400">{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '' }}</span>
+                </div>
+                <p class="text-xs text-gray-500">{{ admin_map.get(log.admin_id, '未知') }} · {{ log.target_type }} {{ '#' ~ log.target_id if log.target_id else '' }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-center space-x-2">
+        {% if page > 1 %}
+        <a href="?page={{ page - 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">上一页</a>
+        {% endif %}
+        <span class="text-sm text-gray-500">第 {{ page }} / {{ total_pages }} 页</span>
+        {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">下一页</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">暂无日志</h3>
+        <p class="text-gray-500 text-sm">管理员操作后将自动记录日志</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
