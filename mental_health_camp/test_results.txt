@@ -1,0 +1,32 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.4, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\marike\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: D:\jianxin_system\mental_health_camp
+plugins: anyio-3.7.1
+collecting ... collected 160 items
+
+tests.py::TestUnauthenticatedAccess::test_unauthenticated_users_page PASSED [  0%]
+tests.py::TestUnauthenticatedAccess::test_unauthenticated_batches_page PASSED [  1%]
+tests.py::TestUnauthenticatedAccess::test_unauthenticated_bootcamps_page PASSED [  1%]
+tests.py::TestInvalidToken::test_invalid_token_access PASSED             [  2%]
+tests.py::TestNonAdminAccess::test_user_accessing_admin_endpoint PASSED  [  3%]
+tests.py::TestAdminAccess::test_admin_users_page PASSED                  [  3%]
+tests.py::TestAdminAccess::test_admin_batches_page PASSED                [  4%]
+tests.py::TestEditUser::test_edit_user_success PASSED                    [  5%]
+tests.py::TestEditUser::test_edit_user_empty_nickname PASSED             [  5%]
+tests.py::TestEditUser::test_edit_user_invalid_id PASSED                 [  6%]
+tests.py::TestEditUser::test_edit_user_not_found PASSED                  [  6%]
+tests.py::TestResetPassword::test_reset_password_success PASSED          [  7%]
+tests.py::TestResetPassword::test_reset_password_too_short PASSED        [  8%]
+tests.py::TestResetPassword::test_reset_password_empty_user_id PASSED    [  8%]
+tests.py::TestDeleteUser::test_delete_user_success PASSED                [  9%]
+tests.py::TestDeleteUser::test_delete_user_no_confirm PASSED             [ 10%]
+tests.py::TestDeleteUser::test_delete_admin_user_blocked PASSED          [ 10%]
+tests.py::TestBatchEnroll::test_batch_enroll_success PASSED              [ 11%]
+tests.py::TestBatchEnroll::test_batch_enroll_empty_user_ids PASSED       [ 11%]
+tests.py::TestBatchEnroll::test_batch_enroll_skip_already_enrolled PASSED [ 12%]
+tests.py::TestBatchOperations::test_edit_batch_success PASSED            [ 13%]
+tests.py::TestBatchOperations::test_edit_batch_empty_name PASSED         [ 13%]
+tests.py::TestBatchOperations::test_delete_batch_success PASSED          [ 14%]
+tests.py::TestBatchOperations::test_delete_batch_reassigns_enrollments PASSED [ 15%]
+tests.py::TestBatchOperations::test_batch_delete_multiple PASSED         [ 15%]

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}审核详情 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div class="mb-2">
+        <a href="/review/pending" class="text-brand-800 hover:text-brand-700 text-sm font-medium inline-flex items-center space-x-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span>返回待审核列表</span>
+        </a>
+    </div>
+
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">审核详情</h1>
+            <p class="text-gray-500 mt-1">
+                用户ID: {{ user_id }} · {{ bootcamp_name }} · 第 {{ submission.day_number }} 天
+            </p>
+        </div>
+        <div>
+            {% if submission.review_status == 'pending' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">待审核</span>
+            {% elif submission.review_status == 'approved' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">已通过</span>
+            {% else %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">未通过</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 提交内容 -->
+    <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
+        <h2 class="text-lg font-bold text-gray-900 mb-6">提交内容</h2>
+        <div class="space-y-6">
+            {% for item in questions_with_answers %}
+            <div class="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-900">{{ item.question.label or '未命名题目' }}</span>
+                        {% if item.question.required %}
+                        <span class="text-red-500 text-xs">*必填</span>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs text-gray-400">
+                        {% if item.question.type == 'text' %}文本框
+                        {% elif item.question.type == 'single' %}单选题
+                        {% elif item.question.type == 'multiple' %}多选题
+                        {% elif item.question.type == 'likert' %}Likert量表
+                        {% elif item.question.type == 'reading' %}段落说明
+                        {% endif %}
+                    </span>
+                </div>
+
+                {% if item.question.type == 'reading' %}
+                <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-700">
+                    {{ item.question.content or '（无内容）' }}
+                </div>
+                {% elif item.question.type == 'likert' %}
+                <div class="flex items-center space-x-2">
+                    {% set score = item.answer|int if item.answer else 0 %}
+                    {% for i in range(1, 6) %}
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium {{ 'bg-brand-100 text-brand-800' if i == score else 'bg-gray-100 text-gray-400' }}">
+                        {{ i }}
+                    </div>
+                    {% endfor %}
+                    {% if item.question.labels and score > 0 and score <= item.question.labels|length %}
+                    <span class="text-sm text-gray-500 ml-2">（{{ item.question.labels[score - 1] }}）</span>
+                    {% endif %}
+                </div>
+                {% elif item.question.type == 'multiple' %}
+                <div class="space-y-1">
+                    {% if item.answer is iterable and item.answer is not string %}
+                    {% for ans in item.answer %}
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-sm text-gray-700">{{ ans }}</span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <span class="text-sm text-gray-500">未作答</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-sm text-gray-700">
+                    {{ item.answer if item.answer else '未作答' }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if not questions_with_answers %}
+            <div class="text-center py-8 text-gray-400">
+                <p>无法加载题目和答案数据</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 审核操作 -->
+    {% if submission.review_status == 'pending' %}
+    <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
+        <h2 class="text-lg font-bold text-gray-900 mb-6">审核操作</h2>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <form method="POST" action="/review/{{ submission.id }}/approve" class="sm:flex-1">
+                <button type="submit" class="min-h-[44px] w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>审核通过</span>
+                </button>
+            </form>
+
+            <form method="POST" action="/review/{{ submission.id }}/reject" class="sm:flex-1">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">不通过原因（可选）</label>
+                    <textarea name="comment" rows="3" placeholder="请输入不通过的原因，以便用户修改后重新提交..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors resize-none"></textarea>
+                </div>
+                <button type="submit" class="min-h-[44px] mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>审核不通过</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    {% elif submission.review_comment %}
+    <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">审核批注</h2>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+            {{ submission.review_comment }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

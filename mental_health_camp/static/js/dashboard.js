@@ -14,7 +14,7 @@ function renderCalendarHeatmap(container, calendar) {
         var day = calendar[i];
         var bgClass, textColor;
         if (day.status === 'completed') {
-            bgClass = 'bg-indigo-600';
+            bgClass = 'bg-brand-800';
             textColor = 'text-white';
         } else if (day.status === 'missed') {
             bgClass = 'bg-red-100';
@@ -26,8 +26,8 @@ function renderCalendarHeatmap(container, calendar) {
         html += '<div class="aspect-square rounded-lg flex items-center justify-center text-xs font-medium ' + bgClass + ' ' + textColor + ' cursor-default" title="第' + day.day + '天 - ' + (day.status === 'completed' ? '已完成' : day.status === 'missed' ? '未完成' : '未到来') + '">' + day.day + '</div>';
     }
     html += '</div>';
-    html += '<div class="flex items-center justify-center space-x-4 mt-3">';
-    html += '<div class="flex items-center space-x-1"><div class="w-3 h-3 rounded bg-indigo-600"></div><span class="text-xs text-gray-500">已完成</span></div>';
+    html += '<div class="flex items-center space-x-4 mt-3">';
+    html += '<div class="flex items-center space-x-1"><div class="w-3 h-3 rounded bg-brand-800"></div><span class="text-xs text-gray-500">已完成</span></div>';
     html += '<div class="flex items-center space-x-1"><div class="w-3 h-3 rounded bg-red-100"></div><span class="text-xs text-gray-500">未完成</span></div>';
     html += '<div class="flex items-center space-x-1"><div class="w-3 h-3 rounded bg-gray-100"></div><span class="text-xs text-gray-500">未到来</span></div>';
     html += '</div>';
@@ -60,11 +60,11 @@ function initLikertChart(canvasId, seriesData) {
             datasets: [{
                 label: series.label,
                 data: values,
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99,102,241,0.1)',
+                borderColor: '#9c0c13',
+                backgroundColor: 'rgba(156,12,19,0.1)',
                 fill: true,
                 tension: 0.3,
-                pointBackgroundColor: '#6366f1',
+                pointBackgroundColor: '#9c0c13',
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2,
                 pointRadius: 5,

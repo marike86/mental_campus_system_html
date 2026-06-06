@@ -6,31 +6,31 @@
     {% if bootcamp is none and day is none %}
     <div class="max-w-2xl mx-auto">
         <div class="mb-6">
-            <a href="/admin/bootcamps" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+            <a href="/admin/bootcamps" class="text-brand-800 hover:text-brand-700 text-sm font-medium inline-flex items-center space-x-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 <span>返回列表</span>
             </a>
         </div>
-        <div class="bg-white rounded-2xl shadow-sm p-8">
+        <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
             <h2 class="text-xl font-bold text-gray-900 mb-6">创建新训练营</h2>
             <form method="POST" action="/admin/bootcamp/new" class="space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">训练营名称</label>
                     <input type="text" name="name" required placeholder="例如：21天情绪管理训练营"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
                     <textarea name="description" rows="3" placeholder="简要描述训练营的目标和内容"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"></textarea>
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors resize-none"></textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">训练天数</label>
                     <input type="number" name="days" value="7" min="1" max="365" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors">
                 </div>
                 <div class="flex items-center space-x-3 pt-2">
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">创建训练营</button>
+                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">创建训练营</button>
                     <a href="/admin/bootcamps" class="text-gray-500 hover:text-gray-700 px-4 py-2.5 font-medium transition-colors">取消</a>
                 </div>
             </form>
@@ -40,13 +40,13 @@
     {% elif bootcamp and day is none %}
     <div class="max-w-3xl mx-auto space-y-6">
         <div class="mb-2">
-            <a href="/admin/bootcamps" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+            <a href="/admin/bootcamps" class="text-brand-800 hover:text-brand-700 text-sm font-medium inline-flex items-center space-x-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 <span>返回列表</span>
             </a>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm p-8">
+        <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-gray-900">训练营信息</h2>
                 {% if bootcamp.is_active %}
@@ -59,30 +59,30 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">训练营名称</label>
                     <input type="text" name="name" value="{{ bootcamp.name }}" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors">
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
                     <textarea name="description" rows="3"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none">{{ bootcamp.description }}</textarea>
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors resize-none">{{ bootcamp.description }}</textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">训练天数</label>
                     <div class="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">{{ bootcamp.days }} 天</div>
                 </div>
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">保存修改</button>
+                <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors">保存修改</button>
             </form>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm p-8">
+        <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
             <h2 class="text-xl font-bold text-gray-900 mb-6">每日表单配置</h2>
             {% if day_forms %}
             <div class="space-y-3">
                 {% for df in day_forms %}
-                <div class="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+                <div class="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all">
                     <div class="flex items-center space-x-4">
-                        <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                            <span class="text-indigo-600 font-bold text-sm">{{ df.day_number }}</span>
+                        <div class="w-10 h-10 bg-brand-100 rounded-lg flex items-center justify-center">
+                            <span class="text-brand-800 font-bold text-sm">{{ df.day_number }}</span>
                         </div>
                         <div>
                             <span class="font-medium text-gray-900">第 {{ df.day_number }} 天</span>
@@ -95,7 +95,7 @@
                             </p>
                         </div>
                     </div>
-                    <a href="/admin/bootcamp/{{ bootcamp.id }}/day/{{ df.day_number }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-white transition-colors">
+                    <a href="/admin/bootcamp/{{ bootcamp.id }}/day/{{ df.day_number }}" class="text-brand-800 hover:text-brand-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-white transition-colors">
                         编辑题目
                     </a>
                 </div>
@@ -110,13 +110,13 @@
     {% elif bootcamp and day %}
     <div class="max-w-3xl mx-auto space-y-6">
         <div class="mb-2">
-            <a href="/admin/bootcamp/{{ bootcamp.id }}" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium inline-flex items-center space-x-1">
+            <a href="/admin/bootcamp/{{ bootcamp.id }}" class="text-brand-800 hover:text-brand-700 text-sm font-medium inline-flex items-center space-x-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 <span>返回 {{ bootcamp.name }}</span>
             </a>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm p-8">
+        <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-gray-900">第 {{ day }} 天 - 表单题目编辑</h2>
                 <span class="text-sm text-gray-500">{{ bootcamp.name }}</span>
@@ -133,14 +133,30 @@
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             <span>添加题目</span>
                         </button>
-                        <div id="addMenu" class="hidden absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
-                            <button type="button" onclick="addQuestion('text')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-t-xl transition-colors">文本框</button>
-                            <button type="button" onclick="addQuestion('single')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">单选题</button>
-                            <button type="button" onclick="addQuestion('multiple')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">多选题</button>
-                            <button type="button" onclick="addQuestion('likert')" class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-b-xl transition-colors">Likert量表</button>
+                        <div id="addMenu" class="hidden absolute left-0 sm:left-0 right-0 sm:right-auto mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-10">
+                            <button type="button" onclick="addQuestion('text')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-800 rounded-t-xl transition-colors flex items-center space-x-2 min-h-[44px]">
+                                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>
+                                <span>文本框</span>
+                            </button>
+                            <button type="button" onclick="addQuestion('single')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-800 transition-colors flex items-center space-x-2 min-h-[44px]">
+                                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                                <span>单选题</span>
+                            </button>
+                            <button type="button" onclick="addQuestion('multiple')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-800 transition-colors flex items-center space-x-2 min-h-[44px]">
+                                <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+                                <span>多选题</span>
+                            </button>
+                            <button type="button" onclick="addQuestion('likert')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-800 transition-colors flex items-center space-x-2 min-h-[44px]">
+                                <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <span>Likert量表</span>
+                            </button>
+                            <button type="button" onclick="addQuestion('reading')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-800 rounded-b-xl transition-colors flex items-center space-x-2 min-h-[44px]">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                <span>段落说明</span>
+                            </button>
                         </div>
                     </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">保存题目</button>
+                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors min-h-[44px]">保存题目</button>
                 </div>
             </form>
         </div>
@@ -150,7 +166,14 @@
 
 <script>
 (function() {
-    var typeLabels = {text: '文本框', single: '单选题', multiple: '多选题', likert: 'Likert量表'};
+    var typeLabels = {text: '文本框', single: '单选题', multiple: '多选题', likert: 'Likert量表', reading: '段落说明'};
+    var typeIcons = {
+        text: '<svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>',
+        single: '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>',
+        multiple: '<svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>',
+        likert: '<svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>',
+        reading: '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>'
+    };
     var questions = [];
 
     var raw = document.getElementById('questionsInput');
@@ -170,7 +193,7 @@
     };
 
     window.addQuestion = function(type) {
-        var q = {id: generateId(), type: type, label: '', condition: null};
+        var q = {id: generateId(), type: type, label: '', required: false, condition: null};
         if (type === 'single' || type === 'multiple') {
             q.options = ['选项1', '选项2'];
         }
@@ -179,9 +202,17 @@
             q.max = 5;
             q.labels = ['完全不', '轻微', '中等', '明显', '严重'];
         }
+        if (type === 'reading') {
+            q.content = '';
+        }
         questions.push(q);
         renderQuestions();
         document.getElementById('addMenu').classList.add('hidden');
+    };
+
+    window.toggleRequired = function(idx) {
+        questions[idx].required = !questions[idx].required;
+        renderQuestions();
     };
 
     window.removeQuestion = function(idx) {
@@ -200,6 +231,24 @@
 
     window.updateLabel = function(idx, value) {
         questions[idx].label = value;
+    };
+
+    window.updateContent = function(idx, value) {
+        questions[idx].content = value;
+    };
+
+    window.updateCorrect = function(idx, value) {
+        questions[idx].correct = value;
+    };
+
+    window.updateCorrectMulti = function(idx, option, checked) {
+        if (!questions[idx].correct || !Array.isArray(questions[idx].correct)) {
+            questions[idx].correct = [];
+        }
+        var arr = questions[idx].correct;
+        var pos = arr.indexOf(option);
+        if (checked && pos === -1) { arr.push(option); }
+        else if (!checked && pos !== -1) { arr.splice(pos, 1); }
     };
 
     window.updateOption = function(qIdx, oIdx, value) {
@@ -231,18 +280,35 @@
             html += '<div class="flex items-center justify-between px-5 py-4 bg-gray-50">';
             html += '<div class="flex items-center space-x-3">';
             html += '<span class="text-gray-400 text-sm font-mono">#' + (i + 1) + '</span>';
-            html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">' + typeLabels[q.type] + '</span>';
+            html += '<span class="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-700">' + (typeIcons[q.type] || '') + '<span>' + typeLabels[q.type] + '</span></span>';
+            if (q.required) {
+                html += '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">必填</span>';
+            }
             html += '</div>';
             html += '<div class="flex items-center space-x-1">';
-            if (i > 0) html += '<button type="button" onclick="moveQuestion(' + i + ',-1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors" title="上移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg></button>';
-            if (i < questions.length - 1) html += '<button type="button" onclick="moveQuestion(' + i + ',1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors" title="下移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>';
-            html += '<button type="button" onclick="removeQuestion(' + i + ')" class="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="删除"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>';
+            if (i > 0) html += '<button type="button" onclick="moveQuestion(' + i + ',-1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="上移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg></button>';
+            if (i < questions.length - 1) html += '<button type="button" onclick="moveQuestion(' + i + ',1)" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="下移"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>';
+            html += '<button type="button" onclick="removeQuestion(' + i + ')" class="p-1.5 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="删除"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>';
             html += '</div></div>';
             html += '<div class="px-5 py-4 space-y-4">';
             html += '<div>';
             html += '<label class="block text-sm font-medium text-gray-600 mb-1">题目标签</label>';
-            html += '<input type="text" value="' + escHtml(q.label) + '" oninput="updateLabel(' + i + ',this.value)" placeholder="例如：今天心情如何？" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-colors">';
+            html += '<input type="text" value="' + escHtml(q.label) + '" oninput="updateLabel(' + i + ',this.value)" placeholder="例如：今天心情如何？" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-base md:text-sm transition-colors">';
             html += '</div>';
+            if (q.type !== 'reading') {
+                html += '<div class="flex items-center space-x-3">';
+                html += '<label class="flex items-center space-x-2 cursor-pointer">';
+                html += '<input type="checkbox" ' + (q.required ? 'checked' : '') + ' onchange="toggleRequired(' + i + ')" class="w-4 h-4 text-brand-800 focus:ring-brand-600 border-gray-300 rounded">';
+                html += '<span class="text-sm text-gray-700">设为必填项</span>';
+                html += '</label>';
+                html += '</div>';
+            }
+            if (q.type === 'reading') {
+                html += '<div>';
+                html += '<label class="block text-sm font-medium text-gray-600 mb-1">段落内容</label>';
+                html += '<textarea rows="5" oninput="updateContent(' + i + ',this.value)" placeholder="请输入阅读材料内容..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-base md:text-sm transition-colors resize-none">' + escHtml(q.content || '') + '</textarea>';
+                html += '</div>';
+            }
             if (q.type === 'single' || q.type === 'multiple') {
                 html += '<div>';
                 html += '<label class="block text-sm font-medium text-gray-600 mb-2">选项</label>';
@@ -254,12 +320,35 @@
                     } else {
                         html += '<div class="w-4 h-4 rounded border-2 border-gray-300 flex-shrink-0"></div>';
                     }
-                    html += '<input type="text" value="' + escHtml(q.options[j]) + '" oninput="updateOption(' + i + ',' + j + ',this.value)" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-colors">';
+                    html += '<input type="text" value="' + escHtml(q.options[j]) + '" oninput="updateOption(' + i + ',' + j + ',this.value)" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-base md:text-sm transition-colors">';
                     html += '<button type="button" onclick="removeOption(' + i + ',' + j + ')" class="p-1 text-gray-400 hover:text-red-500 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
                     html += '</div>';
                 }
                 html += '</div>';
-                html += '<button type="button" onclick="addOption(' + i + ')" class="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium inline-flex items-center space-x-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>添加选项</span></button>';
+                html += '<button type="button" onclick="addOption(' + i + ')" class="mt-2 text-sm text-brand-800 hover:text-brand-700 font-medium inline-flex items-center space-x-1 min-h-[44px] px-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg><span>添加选项</span></button>';
+                html += '</div>';
+                html += '<div class="border-t border-gray-100 pt-3 mt-3">';
+                html += '<label class="block text-sm font-medium text-gray-600 mb-2">正确答案（用于答题验证，可选）</label>';
+                if (q.type === 'single') {
+                    var correctVal = (typeof q.correct === 'string') ? q.correct : '';
+                    html += '<select onchange="updateCorrect(' + i + ',this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base md:text-sm focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">';
+                    html += '<option value="">不设验证</option>';
+                    for (var c = 0; c < (q.options || []).length; c++) {
+                        html += '<option value="' + escHtml(q.options[c]) + '"' + (q.options[c] === correctVal ? ' selected' : '') + '>' + escHtml(q.options[c]) + '</option>';
+                    }
+                    html += '</select>';
+                } else {
+                    var correctArr = Array.isArray(q.correct) ? q.correct : [];
+                    html += '<div class="space-y-1">';
+                    for (var c2 = 0; c2 < (q.options || []).length; c2++) {
+                        var isChecked = correctArr.indexOf(q.options[c2]) !== -1;
+                        html += '<label class="flex items-center space-x-2 text-sm text-gray-700">';
+                        html += '<input type="checkbox"' + (isChecked ? ' checked' : '') + ' onchange="updateCorrectMulti(' + i + ',\'' + escHtml(q.options[c2]).replace(/'/g, "\\'") + '\',this.checked)" class="w-4 h-4 text-brand-800 focus:ring-brand-600 border-gray-300 rounded">';
+                        html += '<span>' + escHtml(q.options[c2]) + '</span>';
+                        html += '</label>';
+                    }
+                    html += '</div>';
+                }
                 html += '</div>';
             }
             if (q.type === 'likert') {
@@ -267,7 +356,7 @@
                 html += '<p class="text-sm text-gray-500 mb-2">Likert量表（1-5），默认标签：完全不 / 轻微 / 中等 / 明显 / 严重</p>';
                 html += '<div class="flex items-center space-x-4">';
                 for (var k = 1; k <= 5; k++) {
-                    html += '<div class="text-center"><div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-1"><span class="text-indigo-600 font-bold text-sm">' + k + '</span></div><span class="text-xs text-gray-500">' + (q.labels && q.labels[k-1] ? q.labels[k-1] : '') + '</span></div>';
+                    html += '<div class="text-center"><div class="w-10 h-10 bg-brand-100 rounded-lg flex items-center justify-center mb-1"><span class="text-brand-800 font-bold text-sm">' + k + '</span></div><span class="text-xs text-gray-500">' + (q.labels && q.labels[k-1] ? q.labels[k-1] : '') + '</span></div>';
                 }
                 html += '</div></div>';
             }
@@ -284,7 +373,7 @@
         var condHtml = '<div class="border-t border-gray-100 pt-3 mt-3">';
         condHtml += '<div class="flex items-center justify-between mb-2">';
         condHtml += '<label class="text-sm font-medium text-gray-600">显示条件</label>';
-        condHtml += '<button type="button" onclick="toggleCondition(' + i + ')" class="text-xs text-indigo-600 hover:text-indigo-700 font-medium">';
+        condHtml += '<button type="button" onclick="toggleCondition(' + i + ')" class="text-xs text-brand-800 hover:text-brand-700 font-medium">';
         condHtml += cond ? '编辑条件' : '设置条件';
         condHtml += '</button></div>';
         if (cond) {
@@ -337,19 +426,19 @@
         modalHtml += '<h3 class="text-lg font-bold text-gray-900 mb-4">设置显示条件</h3>';
         modalHtml += '<div class="space-y-4">';
         modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">当题目</label>';
-        modalHtml += '<select id="condQuestion" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="updateCondOptions()">' + questionOptionsHtml + '</select></div>';
+        modalHtml += '<select id="condQuestion" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base md:text-sm" onchange="updateCondOptions()">' + questionOptionsHtml + '</select></div>';
         modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">运算符</label>';
-        modalHtml += '<select id="condOperator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">';
+        modalHtml += '<select id="condOperator" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base md:text-sm">';
         modalHtml += '<option value="equals"' + (op === 'equals' ? ' selected' : '') + '>等于</option>';
         modalHtml += '<option value="not_equals"' + (op === 'not_equals' ? ' selected' : '') + '>不等于</option>';
         modalHtml += '<option value="includes"' + (op === 'includes' ? ' selected' : '') + '>包含</option>';
         modalHtml += '</select></div>';
         modalHtml += '<div><label class="block text-sm font-medium text-gray-700 mb-1">值</label>';
-        modalHtml += '<select id="condValue" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">' + optionsHtml + '</select></div>';
+        modalHtml += '<select id="condValue" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base md:text-sm">' + optionsHtml + '</select></div>';
         modalHtml += '</div>';
         modalHtml += '<div class="flex items-center justify-end space-x-3 mt-6">';
         modalHtml += '<button onclick="closeConditionModal()" class="text-gray-500 hover:text-gray-700 px-4 py-2 text-sm font-medium">取消</button>';
-        modalHtml += '<button onclick="saveCondition(' + idx + ')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">保存</button>';
+        modalHtml += '<button onclick="saveCondition(' + idx + ')" class="bg-brand-800 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium">保存</button>';
         modalHtml += '</div></div></div>';
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         window._condOtherQuestions = otherQuestions;

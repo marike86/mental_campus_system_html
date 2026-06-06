@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}审核员管理 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">审核员管理</h1>
+            <p class="text-gray-500 mt-1">管理所有审核员账户，查看工作状态和审核记录</p>
+        </div>
+        <a href="/super-admin/reviewer/new" class="bg-brand-800 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            创建审核员
+        </a>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm font-medium text-gray-500">审核员总数</div>
+            <div class="text-2xl font-bold text-gray-900 mt-1">{{ reviewer_stats|length }}</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm font-medium text-gray-500">活跃审核员</div>
+            <div class="text-2xl font-bold text-green-600 mt-1">{{ reviewer_stats|selectattr('reviewer.is_active')|list|length }}</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm font-medium text-gray-500">待审核任务</div>
+            <div class="text-2xl font-bold text-orange-600 mt-1">{{ reviewer_stats|sum(attribute='pending_tasks') }}</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm font-medium text-gray-500">总审核数</div>
+            <div class="text-2xl font-bold text-blue-600 mt-1">{{ reviewer_stats|sum(attribute='total_reviews') }}</div>
+        </div>
+    </div>
+
+    <!-- 审核员列表 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">审核员列表</h2>
+        </div>
+        
+        {% if reviewer_stats %}
+        <!-- 桌面端表格 -->
+        <div class="hidden md:block">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">审核员</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">专业领域</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">待审核</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">已完成</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总审核</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">通过率</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for stat in reviewer_stats %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10">
+                                        <div class="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center">
+                                            <span class="text-sm font-medium text-brand-800">{{ stat.reviewer.nickname[0] }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">{{ stat.reviewer.nickname }}</div>
+                                        <div class="text-sm text-gray-500">{{ stat.reviewer.email }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if stat.reviewer.specialty %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ stat.reviewer.specialty }}
+                                </span>
+                                {% else %}
+                                <span class="text-sm text-gray-400">未设置</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if stat.reviewer.is_active %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    活跃
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    禁用
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {% if stat.pending_tasks > 0 %}
+                                <span class="font-medium text-orange-600">{{ stat.pending_tasks }}</span>
+                                {% else %}
+                                <span class="text-gray-400">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ stat.completed_tasks }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ stat.total_reviews }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                        <div class="bg-green-600 h-2 rounded-full" style="width: {{ stat.approval_rate }}%"></div>
+                                    </div>
+                                    <span class="text-sm text-gray-900">{{ stat.approval_rate }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div class="flex space-x-2">
+                                    <a href="/super-admin/reviewer/{{ stat.reviewer.id }}" class="text-brand-600 hover:text-brand-900">详情</a>
+                                    <a href="/super-admin/reviewer/{{ stat.reviewer.id }}/edit" class="text-blue-600 hover:text-blue-900">编辑</a>
+                                    <form action="/super-admin/reviewer/{{ stat.reviewer.id }}/toggle" method="POST" class="inline">
+                                        {% if stat.reviewer.is_active %}
+                                        <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('确定要禁用此审核员吗？')">禁用</button>
+                                        {% else %}
+                                        <button type="submit" class="text-green-600 hover:text-green-900">启用</button>
+                                        {% endif %}
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 移动端卡片列表 -->
+        <div class="md:hidden space-y-4 p-4">
+            {% for stat in reviewer_stats %}
+            <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                <!-- 审核员头像和基本信息 -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10">
+                        <div class="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center">
+                            <span class="text-sm font-medium text-brand-800">{{ stat.reviewer.nickname[0] }}</span>
+                        </div>
+                    </div>
+                    <div class="ml-3 flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-medium text-gray-900">{{ stat.reviewer.nickname }}</span>
+                            {% if stat.reviewer.is_active %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">活跃</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">禁用</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 truncate">{{ stat.reviewer.email }}</div>
+                    </div>
+                </div>
+
+                <!-- 专业领域 -->
+                {% if stat.reviewer.specialty %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {{ stat.reviewer.specialty }}
+                </span>
+                {% endif %}
+
+                <!-- 关键统计 -->
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-white rounded-lg p-2">
+                        <div class="text-sm font-semibold {% if stat.pending_tasks > 0 %}text-orange-600{% else %}text-gray-400{% endif %}">{{ stat.pending_tasks }}</div>
+                        <div class="text-xs text-gray-500">待审核</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2">
+                        <div class="text-sm font-semibold text-gray-900">{{ stat.completed_tasks }}</div>
+                        <div class="text-xs text-gray-500">已完成</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2">
+                        <div class="text-sm font-semibold text-gray-900">{{ stat.total_reviews }}</div>
+                        <div class="text-xs text-gray-500">总审核</div>
+                    </div>
+                </div>
+
+                <!-- 通过率进度条 -->
+                <div>
+                    <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                        <span>通过率</span>
+                        <span>{{ stat.approval_rate }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-600 h-2 rounded-full" style="width: {{ stat.approval_rate }}%"></div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="flex items-center gap-2 pt-2 border-t border-gray-200">
+                    <a href="/super-admin/reviewer/{{ stat.reviewer.id }}"
+                       class="flex-1 text-center py-2.5 min-h-[44px] inline-flex items-center justify-center text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
+                        详情
+                    </a>
+                    <a href="/super-admin/reviewer/{{ stat.reviewer.id }}/edit"
+                       class="flex-1 text-center py-2.5 min-h-[44px] inline-flex items-center justify-center text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                        编辑
+                    </a>
+                    <form action="/super-admin/reviewer/{{ stat.reviewer.id }}/toggle" method="POST" class="flex-1">
+                        {% if stat.reviewer.is_active %}
+                        <button type="submit" class="w-full py-2.5 min-h-[44px] text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors" onclick="return confirm('确定要禁用此审核员吗？')">禁用</button>
+                        {% else %}
+                        <button type="submit" class="w-full py-2.5 min-h-[44px] text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">启用</button>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-1">暂无审核员</h3>
+            <p class="text-gray-500">点击上方按钮创建第一个审核员</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

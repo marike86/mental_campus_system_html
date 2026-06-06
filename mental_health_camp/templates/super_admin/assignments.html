@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}审核任务分配 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">审核任务分配</h1>
+            <p class="text-gray-500 mt-1">管理待审核内容的分配，支持手动分配和智能分配</p>
+        </div>
+        <form action="/super-admin/auto-assign" method="POST">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                智能分配
+            </button>
+        </form>
+    </div>
+
+    <!-- 审核员负载概览 -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">审核员负载概览</h2>
+        </div>
+        <div class="p-6">
+            {% if active_reviewers %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for reviewer in active_reviewers %}
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <div class="h-10 w-10 rounded-full bg-brand-100 flex items-center justify-center">
+                                <span class="text-sm font-medium text-brand-800">{{ reviewer.nickname[0] }}</span>
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-medium text-gray-900">{{ reviewer.nickname }}</div>
+                                {% if reviewer.specialty %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ reviewer.specialty }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">当前任务</span>
+                            <span class="font-medium text-gray-900">{{ reviewer_workload[reviewer.id].pending_count }} / {{ reviewer.max_concurrent_tasks }}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            {% set load_pct = (reviewer_workload[reviewer.id].pending_count / reviewer.max_concurrent_tasks * 100) if reviewer.max_concurrent_tasks > 0 else 0 %}
+                            <div class="h-2 rounded-full {% if load_pct >= 80 %}bg-red-500{% elif load_pct >= 50 %}bg-yellow-500{% else %}bg-green-500{% endif %}" style="width: {{ load_pct }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">暂无活跃审核员</h3>
+                <p class="text-gray-500">请先创建并启用审核员</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 待分配任务列表 -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">待审核提交 ({{ pending_submissions|length }})</h2>
+                <span class="text-sm text-gray-500">已分配: {{ assigned_submission_ids|length }} | 未分配: {{ pending_submissions|length - assigned_submission_ids|length }}</span>
+            </div>
+        </div>
+        <div class="p-6">
+            {% if pending_submissions %}
+            <div class="space-y-4">
+                {% for submission in pending_submissions %}
+                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg {% if submission.id in assigned_submission_ids %}bg-green-50 border-green-200{% else %}bg-white{% endif %}">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-sm font-medium text-gray-900">提交 #{{ submission.id }}</span>
+                            {% if submission.id in assigned_submission_ids %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">已分配</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">待分配</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">
+                            提交时间: {{ submission.submitted_at.strftime('%Y-%m-%d %H:%M') if submission.submitted_at else '未知' }}
+                        </div>
+                    </div>
+                    
+                    {% if active_reviewers %}
+                    <form action="/super-admin/assign" method="POST" class="flex items-center space-x-2">
+                        <input type="hidden" name="submission_id" value="{{ submission.id }}">
+                        <select name="reviewer_id" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" required>
+                            <option value="">选择审核员</option>
+                            {% for reviewer in active_reviewers %}
+                            <option value="{{ reviewer.id }}" {% if submission.reviewer_id == reviewer.id %}selected{% endif %}>
+                                {{ reviewer.nickname }} ({{ reviewer_workload[reviewer.id].pending_count }}/{{ reviewer.max_concurrent_tasks }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="px-3 py-1.5 bg-brand-800 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors">
+                            分配
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="text-sm text-gray-400">无可用审核员</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">暂无待审核提交</h3>
+                <p class="text-gray-500">当前没有需要分配的审核任务</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

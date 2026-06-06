@@ -21,12 +21,12 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")   # 初始管理员密�
 ADMIN_NICKNAME = os.getenv("ADMIN_NICKNAME", "管理员")     # 初始管理员昵称
 
 # ===== 前端主题配置 =====
-PRIMARY_COLOR = "#6366f1"            # 主色调（indigo-500）
-SECONDARY_COLOR = "#8b5cf6"          # 辅助色（violet-500）
+PRIMARY_COLOR = "#9c0c13"            # 主色调（山大红）
+SECONDARY_COLOR = "#cc293b"          # 辅助色（brand-600）
 ACCENT_COLOR = "#06b6d4"             # 强调色（cyan-500）
-PRIMARY_BG = "bg-indigo-50"          # 主要背景色Tailwind类
-PRIMARY_TEXT = "text-indigo-600"      # 主要文字颜色Tailwind类
-PRIMARY_BTN = "bg-indigo-600 hover:bg-indigo-700"  # 主要按钮Tailwind类
+PRIMARY_BG = "bg-brand-50"           # 主要背景色Tailwind类
+PRIMARY_TEXT = "text-brand-800"       # 主要文字颜色Tailwind类
+PRIMARY_BTN = "bg-brand-800 hover:bg-brand-700"  # 主要按钮Tailwind类
 NAV_BG = "bg-white shadow"           # 导航栏背景Tailwind类
 
 # ===== 表单配置 =====

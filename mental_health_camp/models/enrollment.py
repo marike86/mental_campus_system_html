@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, Date, DateTime, Index
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, DateTime, Index
 from sqlalchemy.sql import func
 from database import Base
 
@@ -10,7 +10,8 @@ class Enrollment(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     bootcamp_id = Column(Integer, ForeignKey("bootcamps.id"), nullable=False, index=True)
     batch_id = Column(Integer, ForeignKey("batches.id"), nullable=True, index=True)
-    start_date = Column(Date, nullable=False)
+    status = Column(String, default="approved", nullable=False)  # pending / approved / rejected
+    start_date = Column(Date, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (

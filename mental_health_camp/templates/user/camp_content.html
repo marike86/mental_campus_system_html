@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}第 {{ day_number }} 天 - {{ bootcamp.name }} - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="fade-in max-w-2xl mx-auto">
+    <div class="mb-6">
+        <a href="/user/today" class="inline-flex items-center min-h-[44px] py-1 text-sm text-gray-500 hover:text-brand-800 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            返回今日任务
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm p-8">
+        <div class="text-center mb-6">
+            <div class="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-brand-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold text-gray-900">{{ bootcamp.name }}</h1>
+            <p class="text-gray-500 mt-1">第 {{ day_number }} 天</p>
+        </div>
+
+        <div id="camp-content-container">
+            <div class="text-center py-8">
+                <div class="animate-spin w-8 h-8 border-4 border-brand-800 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p class="text-gray-500 text-sm">加载中...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/camp_content.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        window.campManager = new CampStepManager({
+            questions: {{ questions_json | tojson }},
+            enrollmentId: {{ enrollment.id }},
+            dayNumber: {{ day_number }},
+            formAction: '/user/form/{{ enrollment.id }}/{{ day_number }}'
+        });
+    });
+</script>
+{% endblock %}

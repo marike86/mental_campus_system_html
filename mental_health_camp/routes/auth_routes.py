@@ -12,12 +12,12 @@ router = APIRouter(tags=["auth"])
 
 
 @router.get("/login")
-async def login_page(request: Request, current_user: User = Depends(get_optional_user)):
+async def login_page(request: Request, current_user: User = Depends(get_optional_user), registered: str = None):
     if current_user:
         if current_user.role == "admin":
             return RedirectResponse("/admin/bootcamps", status_code=302)
         return RedirectResponse("/user/dashboard", status_code=302)
-    return templates.TemplateResponse("login.html", {"request": request, "app_name": APP_NAME})
+    return templates.TemplateResponse("login.html", {"request": request, "app_name": APP_NAME, "registered": registered})
 
 
 @router.post("/login")
@@ -63,6 +63,9 @@ async def register_submit(
     email: str = Form(...),
     password: str = Form(...),
     nickname: str = Form(...),
+    college: str = Form(""),
+    student_id: str = Form(""),
+    grade: str = Form(""),
     db: Session = Depends(get_db),
 ):
     existing = db.query(User).filter(User.email == email).first()
@@ -77,10 +80,13 @@ async def register_submit(
         nickname=nickname,
         hashed_password=get_password_hash(password),
         role="user",
+        college=college.strip() if college else None,
+        student_id=student_id.strip() if student_id else None,
+        grade=grade.strip() if grade else None,
     )
     db.add(user)
     db.commit()
-    return RedirectResponse("/login", status_code=302)
+    return RedirectResponse("/login?registered=1", status_code=302)
 
 
 @router.get("/logout")

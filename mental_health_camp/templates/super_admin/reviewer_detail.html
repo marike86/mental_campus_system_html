@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}审核员详情 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center justify-between">
+        <div>
+            <nav class="flex mb-4" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2">
+                    <li>
+                        <a href="/super-admin/reviewers" class="text-gray-500 hover:text-gray-700">审核员管理</a>
+                    </li>
+                    <li>
+                        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                    </li>
+                    <li>
+                        <span class="text-gray-900">{{ reviewer.nickname }}</span>
+                    </li>
+                </ol>
+            </nav>
+            <h1 class="text-2xl font-bold text-gray-900">{{ reviewer.nickname }}</h1>
+            <p class="text-gray-500 mt-1">{{ reviewer.email }}</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="/super-admin/reviewer/{{ reviewer.id }}/edit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                编辑信息
+            </a>
+            <form action="/super-admin/reviewer/{{ reviewer.id }}/toggle" method="POST" class="inline">
+                {% if reviewer.is_active %}
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors" onclick="return confirm('确定要禁用此审核员吗？')">
+                    禁用账户
+                </button>
+                {% else %}
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    启用账户
+                </button>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- 基本信息卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">基本信息</h2>
+            <div class="space-y-4">
+                <div class="flex justify-between flex-wrap gap-1">
+                    <span class="text-gray-500">账户状态</span>
+                    {% if reviewer.is_active %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">活跃</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">禁用</span>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between flex-wrap gap-1">
+                    <span class="text-gray-500">专业领域</span>
+                    <span class="text-gray-900">{{ reviewer.specialty or '未设置' }}</span>
+                </div>
+                <div class="flex justify-between flex-wrap gap-1">
+                    <span class="text-gray-500">最大并发任务</span>
+                    <span class="text-gray-900">{{ reviewer.max_concurrent_tasks }}</span>
+                </div>
+                <div class="flex justify-between flex-wrap gap-1">
+                    <span class="text-gray-500">创建时间</span>
+                    <span class="text-gray-900">{{ reviewer.created_at.strftime('%Y-%m-%d %H:%M') if reviewer.created_at else '未知' }}</span>
+                </div>
+                <div class="flex justify-between flex-wrap gap-1">
+                    <span class="text-gray-500">最后登录</span>
+                    <span class="text-gray-900">{{ reviewer.last_login.strftime('%Y-%m-%d %H:%M') if reviewer.last_login else '从未登录' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">审核统计</h2>
+            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                <div class="text-center p-3 md:p-4 bg-gray-50 rounded-lg">
+                    <div class="text-2xl md:text-3xl font-bold text-gray-900">{{ total_reviews }}</div>
+                    <div class="text-xs md:text-sm text-gray-500">总审核数</div>
+                </div>
+                <div class="text-center p-3 md:p-4 bg-green-50 rounded-lg">
+                    <div class="text-2xl md:text-3xl font-bold text-green-600">{{ approved_count }}</div>
+                    <div class="text-xs md:text-sm text-gray-500">已通过</div>
+                </div>
+                <div class="text-center p-3 md:p-4 bg-red-50 rounded-lg">
+                    <div class="text-2xl md:text-3xl font-bold text-red-600">{{ rejected_count }}</div>
+                    <div class="text-xs md:text-sm text-gray-500">已拒绝</div>
+                </div>
+                <div class="text-center p-3 md:p-4 bg-blue-50 rounded-lg">
+                    <div class="text-2xl md:text-3xl font-bold text-blue-600">{{ approval_rate }}%</div>
+                    <div class="text-xs md:text-sm text-gray-500">通过率</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 待审核任务 -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">当前待审核任务 ({{ pending_assignments|length }})</h2>
+        </div>
+        <div class="p-6">
+            {% if pending_assignments %}
+            <div class="space-y-4">
+                {% for assignment in pending_assignments %}
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg gap-3">
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">提交 #{{ assignment.submission_id }}</div>
+                        <div class="text-sm text-gray-500">分配时间: {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') if assignment.assigned_at else '未知' }}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            {{ assignment.assignment_type }}
+                        </span>
+                        <a href="/review/{{ assignment.submission_id }}"
+                           class="inline-flex items-center justify-center px-4 py-2 min-h-[44px] text-sm font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
+                            去审核
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">暂无待审核任务</h3>
+                <p class="text-gray-500">该审核员当前没有待处理的审核任务</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 最近审核记录 -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">最近审核记录</h2>
+        </div>
+        <div class="p-6">
+            {% if recent_reviews %}
+            <!-- 桌面端表格 -->
+            <div class="hidden md:block">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">提交ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">审核结果</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">审核时间</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">批注</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for review in recent_reviews %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <a href="/review/{{ review.id }}" class="text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if review.review_status == 'approved' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">通过</span>
+                                    {% elif review.review_status == 'rejected' %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">拒绝</span>
+                                    {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">待审核</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{ review.reviewed_at.strftime('%Y-%m-%d %H:%M') if review.reviewed_at else '-' }}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                    {{ review.review_comment or '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 移动端卡片列表 -->
+            <div class="md:hidden space-y-3">
+                {% for review in recent_reviews %}
+                <div class="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <a href="/review/{{ review.id }}" class="text-sm font-medium text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
+                        {% if review.review_status == 'approved' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">通过</span>
+                        {% elif review.review_status == 'rejected' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">拒绝</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">待审核</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        {{ review.reviewed_at.strftime('%Y-%m-%d %H:%M') if review.reviewed_at else '-' }}
+                    </div>
+                    {% if review.review_comment %}
+                    <div class="text-sm text-gray-600">{{ review.review_comment }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">暂无审核记录</h3>
+                <p class="text-gray-500">该审核员还没有进行过审核</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

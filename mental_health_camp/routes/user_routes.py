@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from database import get_db
@@ -15,6 +15,10 @@ from auth import get_current_user, get_password_hash, verify_password
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import encrypt_data, decrypt_data
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -81,8 +85,19 @@ async def fill_form(request: Request, enrollment_id: int, day: int, current_user
                 self.id = sub.id
                 self.day_number = sub.day_number
                 self.submitted_at = sub.submitted_at
-                self.answers = decrypt_data(sub.answers)
+                self.review_status = sub.review_status
+                self.review_comment = sub.review_comment
+                self.answers = decrypt_data(sub.answers) if sub.review_status != "rejected" else decrypt_data(sub.answers)
         decrypted_existing = _Dec(existing)
+    questions = day_form.questions or []
+    has_reading = any(q.get("type") == "reading" for q in questions)
+    # 如果是被拒绝的提交，显示表单让用户修改
+    if has_reading and not decrypted_existing:
+        return templates.TemplateResponse("user/camp_content.html", {
+            "request": request, "user": current_user, "app_name": APP_NAME,
+            "enrollment": enrollment, "bootcamp": bootcamp, "day_form": day_form,
+            "day_number": day, "questions_json": questions,
+        })
     return templates.TemplateResponse("user/form.html", {
         "request": request, "user": current_user, "app_name": APP_NAME,
         "enrollment": enrollment, "bootcamp": bootcamp, "day_form": day_form,
@@ -96,16 +111,31 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
     if not enrollment:
         raise HTTPException(status_code=404, detail="训练营不存在")
     existing = db.query(Submission).filter(Submission.enrollment_id == enrollment_id, Submission.day_number == day).first()
-    if existing:
+    # 如果已通过或待审核，不允许重新提交
+    if existing and existing.review_status != "rejected":
         return RedirectResponse(f"/user/form/{enrollment_id}/{day}", status_code=302)
+    # 如果是被拒绝的提交，删除旧记录以便重新提交
+    if existing and existing.review_status == "rejected":
+        db.delete(existing)
+        db.commit()
+    # 检查是否需要按顺序提交
+    if day > 1:
+        prev_submission = db.query(Submission).filter(
+            Submission.enrollment_id == enrollment_id,
+            Submission.day_number == day - 1,
+            Submission.review_status == "approved"
+        ).first()
+        if not prev_submission:
+            raise HTTPException(status_code=400, detail="请先完成并等待通过前一天的表单")
+    # 检查必填项
+    day_form = db.query(DayForm).filter(
+        DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == day
+    ).first()
     form_data = await request.form()
     answers = {}
     for key, value in form_data.multi_items():
         if key.startswith("q_"):
             answers[key] = value
-    day_form = db.query(DayForm).filter(
-        DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == day
-    ).first()
     if day_form:
         for q in day_form.questions:
             qid = q["id"]
@@ -117,12 +147,121 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
             else:
                 if qid not in answers:
                     answers[qid] = form_data.get(f"q_{qid}", "")
+            # 验证必填项
+            if q.get("required") and q["type"] != "reading":
+                answer = answers.get(qid)
+                if not answer or (isinstance(answer, str) and not answer.strip()) or (isinstance(answer, list) and len(answer) == 0):
+                    return templates.TemplateResponse("user/form.html", {
+                        "request": request, "user": current_user, "app_name": APP_NAME,
+                        "enrollment": enrollment, "bootcamp": db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first(),
+                        "day_form": day_form, "day_number": day, "existing": None,
+                        "error": f"题目「{q.get('label', '')}」为必填项",
+                    })
     encrypted_answers = encrypt_data(answers)
-    submission = Submission(enrollment_id=enrollment_id, day_number=day, answers=encrypted_answers)
+    submission = Submission(
+        enrollment_id=enrollment_id,
+        day_number=day,
+        answers=encrypted_answers,
+        review_status="pending"
+    )
     db.add(submission)
     db.commit()
     _check_and_award_badges(db, current_user, enrollment)
     return RedirectResponse(f"/user/history/{enrollment_id}", status_code=302)
+
+
+@router.post("/api/verify-answer")
+async def verify_answer(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        body = await request.json()
+        enrollment_id = body.get("enrollment_id")
+        day_number = body.get("day_number")
+        question_id = body.get("question_id")
+        answer = body.get("answer")
+        if not all([enrollment_id, day_number, question_id]):
+            return JSONResponse(status_code=400, content={"correct": False, "message": "参数不完整"})
+        enrollment = db.query(Enrollment).filter(
+            Enrollment.id == int(enrollment_id), Enrollment.user_id == current_user.id
+        ).first()
+        if not enrollment:
+            return JSONResponse(status_code=404, content={"correct": False, "message": "训练营不存在"})
+        day_form = db.query(DayForm).filter(
+            DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == int(day_number)
+        ).first()
+        if not day_form:
+            return JSONResponse(status_code=404, content={"correct": False, "message": "表单不存在"})
+        target_q = None
+        for q in (day_form.questions or []):
+            if q.get("id") == question_id:
+                target_q = q
+                break
+        if not target_q:
+            return JSONResponse(status_code=404, content={"correct": False, "message": "题目不存在"})
+        correct = target_q.get("correct")
+        if correct is None:
+            return JSONResponse(content={"correct": True, "message": "该题无需验证"})
+        if target_q["type"] == "single":
+            is_correct = answer == correct
+        elif target_q["type"] == "multiple":
+            if isinstance(answer, list) and isinstance(correct, list):
+                is_correct = set(answer) == set(correct)
+            else:
+                is_correct = False
+        else:
+            is_correct = True
+        if is_correct:
+            return JSONResponse(content={"correct": True, "message": "回答正确！"})
+        else:
+            return JSONResponse(content={"correct": False, "message": "回答有误，请再试一次"})
+    except Exception as e:
+        logger.exception("验证答案失败: %s", e)
+        return JSONResponse(status_code=500, content={"correct": False, "message": "验证失败，请稍后重试"})
+
+
+@router.get("/bootcamps")
+async def browse_bootcamps(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        bootcamps = db.query(Bootcamp).filter(Bootcamp.is_active == True).order_by(Bootcamp.created_at.desc()).all()
+        my_enrollments = db.query(Enrollment).filter(Enrollment.user_id == current_user.id).all()
+        enrolled_bootcamp_ids = {e.bootcamp_id for e in my_enrollments}
+        bootcamp_list = []
+        for b in bootcamps:
+            enrolled = b.id in enrolled_bootcamp_ids
+            enrollment = next((e for e in my_enrollments if e.bootcamp_id == b.id), None)
+            bootcamp_list.append({"bootcamp": b, "enrolled": enrolled, "enrollment": enrollment})
+        return templates.TemplateResponse("user/bootcamps.html", {
+            "request": request, "user": current_user, "app_name": APP_NAME,
+            "bootcamps": bootcamp_list,
+        })
+    except Exception as e:
+        logger.exception("加载训练营列表失败 (user_id=%d): %s", current_user.id, e)
+        raise HTTPException(status_code=500, detail="加载训练营列表时发生错误")
+
+
+@router.post("/bootcamp/{bootcamp_id}/join")
+async def join_bootcamp(request: Request, bootcamp_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id, Bootcamp.is_active == True).first()
+        if not bootcamp:
+            raise HTTPException(status_code=404, detail="训练营不存在或未发布")
+        existing = db.query(Enrollment).filter(
+            Enrollment.user_id == current_user.id, Enrollment.bootcamp_id == bootcamp_id
+        ).first()
+        if existing:
+            return RedirectResponse("/user/dashboard", status_code=302)
+        enrollment = Enrollment(
+            user_id=current_user.id,
+            bootcamp_id=bootcamp_id,
+            start_date=date.today(),
+        )
+        db.add(enrollment)
+        db.commit()
+        return RedirectResponse("/user/dashboard", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("加入训练营失败 (user_id=%d, bootcamp_id=%d): %s", current_user.id, bootcamp_id, e)
+        raise HTTPException(status_code=500, detail="加入训练营时发生错误")
 
 
 @router.get("/progress")
@@ -190,7 +329,7 @@ async def update_password(request: Request, current_password: str = Form(...), n
         })
     current_user.hashed_password = get_password_hash(new_password)
     db.commit()
-    return RedirectResponse("/user/profile", status_code=300)
+    return RedirectResponse("/user/profile", status_code=302)
 
 
 @router.get("/badges")

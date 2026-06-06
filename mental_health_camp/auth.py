@@ -65,8 +65,22 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
 
 
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
+    return current_user
+
+
+async def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "super_admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要超级管理员权限")
+    return current_user
+
+
+async def require_reviewer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in ("admin", "super_admin", "reviewer"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要审核权限")
+    if current_user.role == "reviewer" and not current_user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="审核员账户已被禁用")
     return current_user
 
 

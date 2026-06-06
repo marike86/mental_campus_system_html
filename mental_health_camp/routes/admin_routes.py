@@ -1,6 +1,8 @@
 import csv
 import io
 import json
+import re
+import urllib.parse
 import logging
 from datetime import date, timedelta, datetime, timezone
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
@@ -15,7 +17,8 @@ from models.enrollment import Enrollment
 from models.submission import Submission
 from models.batch import Batch
 from models.audit_log import AuditLog
-from auth import require_admin
+from models.user_badge import UserBadge
+from auth import require_admin, get_password_hash
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import decrypt_data
@@ -202,60 +205,82 @@ async def export_page(request: Request, admin: User = Depends(require_admin), db
 
 @router.post("/admin/export")
 async def export_csv(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    form_data = await request.form()
-    bootcamp_id_str = form_data.get("bootcamp_id", "")
-    if not bootcamp_id_str:
-        raise HTTPException(status_code=400, detail="请选择训练营")
     try:
-        bootcamp_id = int(bootcamp_id_str)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="训练营ID必须为数字")
-    batch_id = form_data.get("batch_id")
-    bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
-    if not bootcamp:
-        raise HTTPException(status_code=404, detail="训练营不存在")
-    enrollment_query = db.query(Enrollment).filter(Enrollment.bootcamp_id == bootcamp_id)
-    if batch_id:
-        enrollment_query = enrollment_query.filter(Enrollment.batch_id == int(batch_id))
-    enrollments = enrollment_query.all()
-    day_forms = {}
-    for df in db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp_id).all():
-        day_forms[df.day_number] = df
-    output = io.StringIO()
-    output.write('\ufeff')
-    writer = csv.writer(output)
-    writer.writerow(["用户昵称", "日期", "天数", "题目", "答案"])
-    for e in enrollments:
-        user = db.query(User).filter(User.id == e.user_id).first()
-        if not user:
-            continue
-        submissions = db.query(Submission).filter(Submission.enrollment_id == e.id).order_by(Submission.day_number).all()
-        for s in submissions:
-            df = day_forms.get(s.day_number)
-            if not df:
+        form_data = await request.form()
+        bootcamp_id_str = form_data.get("bootcamp_id", "")
+        if not bootcamp_id_str:
+            raise HTTPException(status_code=400, detail="请选择训练营")
+        try:
+            bootcamp_id = int(bootcamp_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="训练营ID必须为数字")
+        batch_id = form_data.get("batch_id", "").strip()
+        bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
+        if not bootcamp:
+            raise HTTPException(status_code=404, detail="训练营不存在")
+        enrollment_query = db.query(Enrollment).filter(Enrollment.bootcamp_id == bootcamp_id)
+        if batch_id:
+            try:
+                batch_id_int = int(batch_id)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="批次ID必须为数字")
+            enrollment_query = enrollment_query.filter(Enrollment.batch_id == batch_id_int)
+        enrollments = enrollment_query.all()
+        day_forms = {}
+        for df in db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp_id).all():
+            day_forms[df.day_number] = df
+        output = io.StringIO()
+        output.write('\ufeff')
+        writer = csv.writer(output)
+        writer.writerow(["用户昵称", "日期", "天数", "题目", "答案"])
+        for e in enrollments:
+            user = db.query(User).filter(User.id == e.user_id).first()
+            if not user:
                 continue
-            answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
-            for q in df.questions:
-                qid = q["id"]
-                answer = answers.get(qid, "")
-                if isinstance(answer, list):
-                    answer = ", ".join(answer)
-                elif q["type"] == "likert" and isinstance(answer, int):
-                    labels = q.get("labels", [])
-                    if 1 <= answer <= len(labels):
-                        answer = f"{answer} - {labels[answer - 1]}"
-                    else:
-                        answer = str(answer)
-                submit_date = e.start_date + timedelta(days=s.day_number - 1) if e.start_date else ""
-                writer.writerow([user.nickname, str(submit_date), s.day_number, q.get("label", ""), answer])
-    output.seek(0)
-    filename = f"{bootcamp.name}_export.csv"
-    log_admin_action(db, admin.id, "导出数据", "bootcamp", bootcamp_id, {"batch_id": batch_id, "enrollment_count": len(enrollments)})
-    return StreamingResponse(
-        io.BytesIO(output.getvalue().encode("utf-8-sig")),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+            submissions = db.query(Submission).filter(Submission.enrollment_id == e.id).order_by(Submission.day_number).all()
+            for s in submissions:
+                df = day_forms.get(s.day_number)
+                if not df:
+                    continue
+                try:
+                    answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
+                except Exception:
+                    logger.warning("解密答案数据失败 (submission_id=%d)", s.id)
+                    answers = {}
+                for q in (df.questions or []):
+                    qid = q["id"]
+                    answer = answers.get(qid, "")
+                    if isinstance(answer, list):
+                        answer = ", ".join(answer)
+                    elif q["type"] == "likert" and isinstance(answer, int):
+                        labels = q.get("labels", [])
+                        if 1 <= answer <= len(labels):
+                            answer = f"{answer} - {labels[answer - 1]}"
+                        else:
+                            answer = str(answer)
+                    submit_date = e.start_date + timedelta(days=s.day_number - 1) if e.start_date else ""
+                    writer.writerow([user.nickname, str(submit_date), s.day_number, q.get("label", ""), answer])
+        output.seek(0)
+        safe_name = re.sub(r'[^\w\u4e00-\u9fff-]', '_', bootcamp.name)
+        filename = f"{safe_name}_export.csv"
+        encoded_filename = urllib.parse.quote(filename)
+        log_admin_action(db, admin.id, "导出数据", "bootcamp", bootcamp_id, {"batch_id": batch_id, "enrollment_count": len(enrollments)})
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8-sig")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("CSV导出失败 (admin_id=%d): %s", admin.id, e)
+        bootcamps = db.query(Bootcamp).all()
+        bootcamp_data = [{"id": b.id, "name": b.name, "days": b.days, "batch_list": []} for b in bootcamps]
+        return templates.TemplateResponse("admin/export.html", {
+            "request": request, "user": admin, "app_name": APP_NAME,
+            "bootcamps": bootcamp_data, "data": None, "selected_bootcamp": None,
+            "error": "导出失败，请稍后重试",
+        }, status_code=500)
 
 
 @router.get("/admin/dashboard")
@@ -359,7 +384,7 @@ async def admin_batches(request: Request, admin: User = Depends(require_admin), 
                 "created_at": batch.created_at,
                 "user_count": user_count
             })
-        bootcamp_list.append({"bootcamp": b, "batches": batch_data})
+        bootcamp_list.append({"id": b.id, "name": b.name, "days": b.days, "batches": batch_data})
     return templates.TemplateResponse("admin/batches.html", {
         "request": request, "user": admin, "app_name": APP_NAME, "bootcamps": bootcamp_list,
     })
@@ -378,13 +403,25 @@ async def create_batch(request: Request, admin: User = Depends(require_admin), d
     name = form_data.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="批次名称不能为空")
-    start_date_str = form_data.get("start_date")
-    end_date_str = form_data.get("end_date")
+    start_date_str = form_data.get("start_date", "").strip()
+    end_date_str = form_data.get("end_date", "").strip()
+    start_date = None
+    end_date = None
+    if start_date_str:
+        try:
+            start_date = date.fromisoformat(start_date_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="开始日期格式不正确")
+    if end_date_str:
+        try:
+            end_date = date.fromisoformat(end_date_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="结束日期格式不正确")
     batch = Batch(
         bootcamp_id=bootcamp_id,
         name=name,
-        start_date=date.fromisoformat(start_date_str) if start_date_str else None,
-        end_date=date.fromisoformat(end_date_str) if end_date_str else None,
+        start_date=start_date,
+        end_date=end_date,
     )
     db.add(batch)
     db.commit()
@@ -404,3 +441,363 @@ async def view_user_data(request: Request, admin: User = Depends(require_admin),
         raise HTTPException(status_code=400, detail="用户ID必须为数字")
     log_admin_action(db, admin.id, "查看用户数据", "user", user_id)
     return RedirectResponse(f"/admin/users", status_code=302)
+
+
+@router.post("/admin/batch-enroll")
+async def batch_enroll_users(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        bootcamp_id_str = form_data.get("bootcamp_id", "")
+        user_ids_str = form_data.get("user_ids", "")
+        if not bootcamp_id_str:
+            raise HTTPException(status_code=400, detail="请选择训练营")
+        try:
+            bootcamp_id = int(bootcamp_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="训练营ID必须为数字")
+        bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
+        if not bootcamp:
+            raise HTTPException(status_code=404, detail="训练营不存在")
+        if not user_ids_str:
+            raise HTTPException(status_code=400, detail="请选择要分配的用户")
+        user_id_list = []
+        for uid_str in user_ids_str.split(","):
+            uid_str = uid_str.strip()
+            if uid_str:
+                try:
+                    user_id_list.append(int(uid_str))
+                except (TypeError, ValueError):
+                    continue
+        if not user_id_list:
+            raise HTTPException(status_code=400, detail="没有有效的用户ID")
+        batch_id_str = form_data.get("batch_id", "").strip()
+        batch_id = int(batch_id_str) if batch_id_str and batch_id_str.isdigit() else None
+        enrolled_count = 0
+        skipped_count = 0
+        for uid in user_id_list:
+            existing = db.query(Enrollment).filter(
+                Enrollment.user_id == uid, Enrollment.bootcamp_id == bootcamp_id
+            ).first()
+            if existing:
+                skipped_count += 1
+                continue
+            user = db.query(User).filter(User.id == uid).first()
+            if not user:
+                skipped_count += 1
+                continue
+            enrollment = Enrollment(
+                user_id=uid,
+                bootcamp_id=bootcamp_id,
+                start_date=date.today(),
+                batch_id=batch_id,
+            )
+            db.add(enrollment)
+            enrolled_count += 1
+        db.commit()
+        log_admin_action(db, admin.id, "批量分配训练营", "bootcamp", bootcamp_id, {
+            "user_ids": user_id_list, "batch_id": batch_id,
+            "enrolled": enrolled_count, "skipped": skipped_count,
+        })
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("批量分配训练营失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="批量分配训练营时发生错误")
+
+
+@router.post("/admin/reset-password")
+async def admin_reset_password(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        user_id_str = form_data.get("user_id", "")
+        new_password = form_data.get("new_password", "")
+        if not user_id_str:
+            raise HTTPException(status_code=400, detail="用户ID不能为空")
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="用户ID必须为数字")
+        if not new_password or len(new_password) < 6:
+            raise HTTPException(status_code=400, detail="新密码长度不能少于6位")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        user.hashed_password = get_password_hash(new_password)
+        db.commit()
+        log_admin_action(db, admin.id, "重置用户密码", "user", user_id)
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("重置密码失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="重置密码时发生错误")
+
+
+@router.post("/admin/delete-user")
+async def admin_delete_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        user_id_str = form_data.get("user_id", "")
+        confirm = form_data.get("confirm", "")
+        if not user_id_str:
+            raise HTTPException(status_code=400, detail="用户ID不能为空")
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="用户ID必须为数字")
+        if confirm != "yes":
+            raise HTTPException(status_code=400, detail="请确认删除操作")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        if user.role == "admin":
+            raise HTTPException(status_code=400, detail="不能删除管理员账号")
+        user_nickname = user.nickname
+        user_email = user.email
+        enrollments = db.query(Enrollment).filter(Enrollment.user_id == user_id).all()
+        enrollment_ids = [e.id for e in enrollments]
+        if enrollment_ids:
+            db.query(Submission).filter(Submission.enrollment_id.in_(enrollment_ids)).delete(synchronize_session=False)
+            db.query(Enrollment).filter(Enrollment.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserBadge).filter(UserBadge.user_id == user_id).delete(synchronize_session=False)
+        db.delete(user)
+        db.commit()
+        log_admin_action(db, admin.id, "删除用户", "user", user_id, {"nickname": user_nickname, "email": user_email})
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("删除用户失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="删除用户时发生错误")
+
+
+@router.post("/admin/create-user")
+async def admin_create_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        email = form_data.get("email", "").strip()
+        nickname = form_data.get("nickname", "").strip()
+        password = form_data.get("password", "")
+        role = form_data.get("role", "user")
+        college = form_data.get("college", "").strip()
+        student_id = form_data.get("student_id", "").strip()
+        grade = form_data.get("grade", "").strip()
+        if not email:
+            raise HTTPException(status_code=400, detail="邮箱不能为空")
+        if not nickname:
+            raise HTTPException(status_code=400, detail="昵称不能为空")
+        if not password or len(password) < 6:
+            raise HTTPException(status_code=400, detail="密码长度不能少于6位")
+        if role not in ("user", "admin", "reviewer"):
+            raise HTTPException(status_code=400, detail="角色必须为 user、admin 或 reviewer")
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="该邮箱已被注册")
+        user = User(
+            email=email,
+            nickname=nickname,
+            hashed_password=get_password_hash(password),
+            role=role,
+            college=college or None,
+            student_id=student_id or None,
+            grade=grade or None,
+        )
+        db.add(user)
+        db.commit()
+        log_admin_action(db, admin.id, "创建用户", "user", user.id, {"email": email, "nickname": nickname, "role": role})
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("创建用户失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="创建用户时发生错误")
+
+
+@router.post("/admin/enrollment/{enrollment_id}/approve")
+async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="申请不存在")
+        enrollment.status = "approved"
+        enrollment.start_date = date.today()
+        db.commit()
+        log_admin_action(db, admin.id, "审批通过加入申请", "enrollment", enrollment_id)
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("审批加入申请失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="审批时发生错误")
+
+
+@router.post("/admin/enrollment/{enrollment_id}/reject")
+async def reject_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="申请不存在")
+        enrollment.status = "rejected"
+        db.commit()
+        log_admin_action(db, admin.id, "拒绝加入申请", "enrollment", enrollment_id)
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("拒绝加入申请失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="操作失败")
+
+
+@router.post("/admin/edit-user")
+async def admin_edit_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        user_id_str = form_data.get("user_id", "")
+        if not user_id_str:
+            raise HTTPException(status_code=400, detail="用户ID不能为空")
+        try:
+            user_id = int(user_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="用户ID必须为数字")
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        nickname = form_data.get("nickname", "").strip()
+        if not nickname:
+            raise HTTPException(status_code=400, detail="昵称不能为空")
+        user.nickname = nickname
+        user.student_id = form_data.get("student_id", "").strip() or None
+        user.college = form_data.get("college", "").strip() or None
+        user.grade = form_data.get("grade", "").strip() or None
+        db.commit()
+        log_admin_action(db, admin.id, "编辑用户信息", "user", user_id, {"nickname": nickname})
+        return RedirectResponse("/admin/users", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("编辑用户失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="编辑用户信息时发生错误")
+
+
+@router.post("/admin/batch/edit")
+async def admin_edit_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        batch_id_str = form_data.get("batch_id", "")
+        if not batch_id_str:
+            raise HTTPException(status_code=400, detail="批次ID不能为空")
+        try:
+            batch_id = int(batch_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="批次ID必须为数字")
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="批次不存在")
+        name = form_data.get("name", "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="批次名称不能为空")
+        batch.name = name
+        batch.description = form_data.get("description", "").strip()
+        start_date_str = form_data.get("start_date", "").strip()
+        end_date_str = form_data.get("end_date", "").strip()
+        if start_date_str:
+            try:
+                batch.start_date = date.fromisoformat(start_date_str)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="开始日期格式不正确")
+        else:
+            batch.start_date = None
+        if end_date_str:
+            try:
+                batch.end_date = date.fromisoformat(end_date_str)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="结束日期格式不正确")
+        else:
+            batch.end_date = None
+        is_active_str = form_data.get("is_active", "")
+        batch.is_active = is_active_str in ("on", "true", "1")
+        db.commit()
+        log_admin_action(db, admin.id, "编辑批次", "batch", batch_id, {"name": name})
+        return RedirectResponse("/admin/batches", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("编辑批次失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="编辑批次时发生错误")
+
+
+@router.post("/admin/batch/delete")
+async def admin_delete_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        batch_id_str = form_data.get("batch_id", "")
+        if not batch_id_str:
+            raise HTTPException(status_code=400, detail="批次ID不能为空")
+        try:
+            batch_id = int(batch_id_str)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="批次ID必须为数字")
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="批次不存在")
+        enrollment_count = db.query(Enrollment).filter(Enrollment.batch_id == batch_id).count()
+        if enrollment_count > 0:
+            db.query(Enrollment).filter(Enrollment.batch_id == batch_id).update(
+                {"batch_id": None}, synchronize_session=False
+            )
+        batch_name = batch.name
+        db.delete(batch)
+        db.commit()
+        log_admin_action(db, admin.id, "删除批次", "batch", batch_id, {
+            "name": batch_name, "reassigned_enrollments": enrollment_count,
+        })
+        return RedirectResponse("/admin/batches", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("删除批次失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="删除批次时发生错误")
+
+
+@router.post("/admin/batch/batch-delete")
+async def admin_batch_delete_batches(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    try:
+        form_data = await request.form()
+        batch_ids_str = form_data.get("batch_ids", "")
+        if not batch_ids_str:
+            raise HTTPException(status_code=400, detail="请选择要删除的批次")
+        batch_id_list = []
+        for bid_str in batch_ids_str.split(","):
+            bid_str = bid_str.strip()
+            if bid_str:
+                try:
+                    batch_id_list.append(int(bid_str))
+                except (TypeError, ValueError):
+                    continue
+        if not batch_id_list:
+            raise HTTPException(status_code=400, detail="没有有效的批次ID")
+        deleted_count = 0
+        reassigned_total = 0
+        for bid in batch_id_list:
+            batch = db.query(Batch).filter(Batch.id == bid).first()
+            if not batch:
+                continue
+            enrollment_count = db.query(Enrollment).filter(Enrollment.batch_id == bid).count()
+            if enrollment_count > 0:
+                db.query(Enrollment).filter(Enrollment.batch_id == bid).update(
+                    {"batch_id": None}, synchronize_session=False
+                )
+                reassigned_total += enrollment_count
+            db.delete(batch)
+            deleted_count += 1
+        db.commit()
+        log_admin_action(db, admin.id, "批量删除批次", "batch", None, {
+            "batch_ids": batch_id_list, "deleted": deleted_count, "reassigned_enrollments": reassigned_total,
+        })
+        return RedirectResponse("/admin/batches", status_code=302)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("批量删除批次失败 (admin_id=%d): %s", admin.id, e)
+        raise HTTPException(status_code=500, detail="批量删除批次时发生错误")

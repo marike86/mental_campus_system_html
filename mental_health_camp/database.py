@@ -14,5 +14,5 @@ def get_db():
         db.close()
 
 def init_db():
-    from models import user, bootcamp, day_form, enrollment, submission, batch, badge, user_badge, audit_log
+    from models import user, bootcamp, day_form, enrollment, submission, batch, badge, user_badge, audit_log, review_assignment
     Base.metadata.create_all(bind=engine)

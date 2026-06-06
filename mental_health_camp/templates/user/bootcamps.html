@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}训练营列表 - {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="space-y-6 fade-in">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">训练营列表</h1>
+        <p class="text-gray-500 mt-1">浏览并加入感兴趣的训练营</p>
+    </div>
+
+    {% if bootcamps %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for item in bootcamps %}
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div class="p-6">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-brand-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-brand-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-gray-900">{{ item.bootcamp.name }}</h3>
+                            <p class="text-sm text-gray-500">{{ item.bootcamp.days }}天训练营</p>
+                        </div>
+                    </div>
+                    {% if item.enrolled %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">已加入</span>
+                    {% endif %}
+                </div>
+                {% if item.bootcamp.description %}
+                <p class="text-sm text-gray-500 mb-4 line-clamp-2">{{ item.bootcamp.description }}</p>
+                {% endif %}
+                <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                        <span class="flex items-center space-x-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span>{{ item.bootcamp.days }}天</span>
+                        </span>
+                    </div>
+                    {% if item.enrolled %}
+                    <a href="/user/today" class="bg-brand-800 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        进入训练
+                    </a>
+                    {% else %}
+                    <form method="POST" action="/user/bootcamp/{{ item.bootcamp.id }}/join" onsubmit="return confirm('确定要加入「{{ item.bootcamp.name }}」吗？加入后将从今天开始计时。')">
+                        <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-colors inline-flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            立即加入
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">暂无可加入的训练营</h3>
+        <p class="text-gray-500 text-sm">请等待管理员发布训练营</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -72,11 +72,11 @@
     {% if total_pages > 1 %}
     <div class="flex items-center justify-center space-x-2">
         {% if page > 1 %}
-        <a href="?page={{ page - 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">上一页</a>
+        <a href="?page={{ page - 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">上一页</a>
         {% endif %}
         <span class="text-sm text-gray-500">第 {{ page }} / {{ total_pages }} 页</span>
         {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors">下一页</a>
+        <a href="?page={{ page + 1 }}" class="px-3 py-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">下一页</a>
         {% endif %}
     </div>
     {% endif %}

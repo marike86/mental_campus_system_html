@@ -2,9 +2,76 @@
 {% block title %}用户管理 - {{ APP_NAME }}{% endblock %}
 {% block content %}
 <div class="space-y-6 fade-in">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900">用户管理</h1>
-        <p class="text-gray-500 mt-1">查看用户列表并分配训练营</p>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">用户管理</h1>
+            <p class="text-gray-500 mt-1">查看用户列表并管理用户信息</p>
+        </div>
+        <button onclick="document.getElementById('createUserModal').classList.remove('hidden');document.body.style.overflow='hidden'" class="bg-brand-800 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors inline-flex items-center space-x-2 min-h-[44px]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>创建用户</span>
+        </button>
+    </div>
+
+    <!-- 创建用户弹窗 -->
+    <div id="createUserModal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeCreateUserModal()"></div>
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-gray-900">创建新用户</h3>
+                        <button type="button" onclick="closeCreateUserModal()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <form method="POST" action="/admin/create-user" class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">邮箱 <span class="text-red-500">*</span></label>
+                        <input type="email" name="email" required placeholder="user@example.com"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">昵称 <span class="text-red-500">*</span></label>
+                        <input type="text" name="nickname" required placeholder="用户昵称"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">密码 <span class="text-red-500">*</span></label>
+                        <input type="password" name="password" required minlength="6" placeholder="至少6位"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                        <select name="role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                            <option value="user">参与者</option>
+                            <option value="reviewer">审核员</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">学院</label>
+                        <input type="text" name="college" placeholder="选填"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">学号</label>
+                        <input type="text" name="student_id" placeholder="选填"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">年级</label>
+                        <input type="text" name="grade" placeholder="选填"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-sm transition-colors">
+                    </div>
+                    <div class="flex items-center justify-end space-x-3 pt-4">
+                        <button type="button" onclick="closeCreateUserModal()" class="text-gray-600 hover:text-gray-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">取消</button>
+                        <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">创建用户</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     {% if not users %}
@@ -19,12 +86,31 @@
     </div>
     {% else %}
 
+    <div id="batch-toolbar" class="bg-white rounded-2xl shadow-sm px-6 py-4 flex items-center space-x-4 flex-wrap gap-2 sm:gap-4">
+        <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" class="w-4 h-4 text-brand-800 border-gray-300 rounded focus:ring-brand-600">
+            <span class="text-sm text-gray-600">全选</span>
+        </label>
+        <span id="selected-count" class="text-sm text-gray-500">已选 0 位用户</span>
+        <div class="flex-1"></div>
+        <button type="button" onclick="openBatchEnrollModal()" id="batch-enroll-btn" class="bg-brand-800 hover:bg-brand-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors inline-flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]" disabled>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span>批量分配训练营</span>
+        </button>
+    </div>
+
     <div class="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden">
         <table class="w-full">
             <thead>
                 <tr class="border-b border-gray-100">
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500 w-10"></th>
                     <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">昵称</th>
                     <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">邮箱</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">学院</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">学号</th>
+                    <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">年级</th>
                     <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">注册时间</th>
                     <th class="text-left px-6 py-4 text-sm font-medium text-gray-500">已分配训练营</th>
                     <th class="text-right px-6 py-4 text-sm font-medium text-gray-500">操作</th>
@@ -34,15 +120,27 @@
                 {% for u in users %}
                 <tr class="hover:bg-gray-50 transition-colors">
                     <td class="px-6 py-4">
+                        <input type="checkbox" name="user_checkbox" value="{{ u.id }}" onchange="updateSelectedCount()" class="w-4 h-4 text-brand-800 border-gray-300 rounded focus:ring-brand-600">
+                    </td>
+                    <td class="px-6 py-4">
                         <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span class="text-sm font-medium text-indigo-600">{{ u.nickname[0] }}</span>
+                            <div class="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-sm font-medium text-brand-800">{{ u.nickname[0] }}</span>
                             </div>
                             <span class="font-medium text-gray-900">{{ u.nickname }}</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">
                         <span class="text-gray-500 text-sm">{{ u.email }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-gray-500 text-sm">{{ u.college or '—' }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-gray-500 text-sm">{{ u.student_id or '—' }}</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-gray-500 text-sm">{{ u.grade or '—' }}</span>
                     </td>
                     <td class="px-6 py-4">
                         <span class="text-gray-500 text-sm">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</span>
@@ -53,7 +151,7 @@
                                 {% for eid in enrollment_map[u.id] %}
                                 {% for b in bootcamps %}
                                     {% if b.id == eid %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">{{ b.name }}</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-700">{{ b.name }}</span>
                                     {% endif %}
                                 {% endfor %}
                                 {% endfor %}
@@ -63,18 +161,11 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <form method="POST" action="/admin/enroll" class="flex items-center justify-end space-x-2">
-                            <input type="hidden" name="user_id" value="{{ u.id }}">
-                            <select name="bootcamp_id" required onchange="updateBatchSelect(this)" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
-                                {% for b in bootcamps %}
-                                <option value="{{ b.id }}">{{ b.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <select name="batch_id" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white batch-select">
-                                <option value="">无批次</option>
-                            </select>
-                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded-lg font-medium transition-colors">分配</button>
-                        </form>
+                        <div class="flex items-center justify-end space-x-1">
+                            <button type="button" onclick="openEditModal({{ u.id }}, '{{ u.nickname }}', '{{ u.college or '' }}', '{{ u.student_id or '' }}', '{{ u.grade or '' }}')" class="text-brand-800 hover:text-brand-700 text-sm font-medium px-2 py-1.5 rounded-lg hover:bg-brand-50 transition-colors">编辑</button>
+                            <button type="button" onclick="openResetPasswordModal({{ u.id }}, '{{ u.nickname }}')" class="text-orange-600 hover:text-orange-700 text-sm font-medium px-2 py-1.5 rounded-lg hover:bg-orange-50 transition-colors">重置密码</button>
+                            <button type="button" onclick="confirmDeleteUser({{ u.id }}, '{{ u.nickname }}')" class="text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors">删除</button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -85,43 +176,207 @@
     <div class="md:hidden space-y-4">
         {% for u in users %}
         <div class="bg-white rounded-2xl shadow-sm p-5">
-            <div class="flex items-center space-x-3 mb-3">
-                <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span class="text-sm font-medium text-indigo-600">{{ u.nickname[0] }}</span>
+            <div class="flex items-start space-x-3 mb-3">
+                <input type="checkbox" name="user_checkbox" value="{{ u.id }}" onchange="updateSelectedCount()" class="w-4 h-4 mt-1 text-brand-800 border-gray-300 rounded focus:ring-brand-600 flex-shrink-0 min-w-[44px] min-h-[44px]">
+                <div class="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-sm font-medium text-brand-800">{{ u.nickname[0] }}</span>
                 </div>
-                <div>
+                <div class="flex-1 min-w-0">
                     <h3 class="font-semibold text-gray-900">{{ u.nickname }}</h3>
                     <p class="text-sm text-gray-500">{{ u.email }}</p>
                 </div>
             </div>
+            <div class="ml-7 space-y-1 mb-3">
+                {% if u.college %}
+                <p class="text-sm text-gray-600">学院：{{ u.college }}</p>
+                {% endif %}
+                {% if u.student_id %}
+                <p class="text-sm text-gray-600">学号：{{ u.student_id }}</p>
+                {% endif %}
+                {% if u.grade %}
+                <p class="text-sm text-gray-600">年级：{{ u.grade }}</p>
+                {% endif %}
+            </div>
             {% if u.id in enrollment_map %}
-            <div class="flex flex-wrap gap-1.5 mb-4">
+            <div class="flex flex-wrap gap-1.5 mb-4 ml-7">
                 {% for eid in enrollment_map[u.id] %}
                 {% for b in bootcamps %}
                     {% if b.id == eid %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">{{ b.name }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-700">{{ b.name }}</span>
                     {% endif %}
                 {% endfor %}
                 {% endfor %}
             </div>
             {% endif %}
-            <form method="POST" action="/admin/enroll" class="flex items-center space-x-2">
-                <input type="hidden" name="user_id" value="{{ u.id }}">
-                <select name="bootcamp_id" required onchange="updateBatchSelect(this)" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
-                    {% for b in bootcamps %}
-                    <option value="{{ b.id }}">{{ b.name }}</option>
-                    {% endfor %}
-                </select>
-                <select name="batch_id" class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white batch-select">
-                    <option value="">无批次</option>
-                </select>
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors flex-shrink-0">分配</button>
-            </form>
+            <div class="flex items-center space-x-2 ml-7">
+                <button type="button" onclick="openEditModal({{ u.id }}, '{{ u.nickname }}', '{{ u.college or '' }}', '{{ u.student_id or '' }}', '{{ u.grade or '' }}')" class="flex-1 text-center bg-brand-50 hover:bg-brand-100 text-brand-800 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px]">编辑</button>
+                <button type="button" onclick="openResetPasswordModal({{ u.id }}, '{{ u.nickname }}')" class="flex-1 text-center bg-orange-50 hover:bg-orange-100 text-orange-600 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px]">重置密码</button>
+                <button type="button" onclick="confirmDeleteUser({{ u.id }}, '{{ u.nickname }}')" class="flex-1 text-center bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px]">删除</button>
+            </div>
         </div>
         {% endfor %}
     </div>
 
     {% endif %}
+</div>
+
+<div id="batch-enroll-modal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeBatchEnrollModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900">批量分配训练营</h3>
+                    <button type="button" onclick="closeBatchEnrollModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <form method="POST" action="/admin/batch-enroll" class="px-6 py-4 space-y-4">
+                <input type="hidden" name="user_ids" id="batch-user-ids" value="">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">选择训练营</label>
+                    <select name="bootcamp_id" required onchange="updateBatchModalSelect(this)" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none bg-white">
+                        <option value="">请选择训练营</option>
+                        {% for b in bootcamps %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">选择批次</label>
+                    <select name="batch_id" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none bg-white batch-select-modal">
+                        <option value="">无批次</option>
+                    </select>
+                </div>
+                <div class="bg-brand-50 rounded-lg px-4 py-3">
+                    <p class="text-sm text-brand-800">将为 <strong id="batch-enroll-count">0</strong> 位用户分配训练营</p>
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeBatchEnrollModal()" class="text-gray-600 hover:text-gray-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">取消</button>
+                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white text-sm px-5 py-2 rounded-lg font-medium transition-colors">确认分配</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="edit-user-modal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeEditModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900">编辑用户信息</h3>
+                    <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <form method="POST" action="/admin/edit-user" class="px-6 py-4 space-y-4">
+                <input type="hidden" name="user_id" id="edit-user-id" value="">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+                    <input type="text" name="nickname" id="edit-nickname" required class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">学院</label>
+                    <input type="text" name="college" id="edit-college" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">学号</label>
+                    <input type="text" name="student_id" id="edit-student-id" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">年级</label>
+                    <input type="text" name="grade" id="edit-grade" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeEditModal()" class="text-gray-600 hover:text-gray-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">取消</button>
+                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white text-sm px-5 py-2 rounded-lg font-medium transition-colors">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="reset-password-modal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeResetPasswordModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900">重置密码</h3>
+                    <button type="button" onclick="closeResetPasswordModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <form method="POST" action="/admin/reset-password" class="px-6 py-4 space-y-4">
+                <input type="hidden" name="user_id" id="reset-user-id" value="">
+                <div class="bg-orange-50 rounded-lg px-4 py-3">
+                    <p class="text-sm text-orange-700">即将为用户 <strong id="reset-user-name"></strong> 重置密码</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                    <input type="password" name="new_password" required minlength="6" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
+                    <input type="password" name="confirm_password" required minlength="6" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none" oninput="checkPasswordMatch()">
+                    <p id="password-match-msg" class="text-xs text-red-500 mt-1 hidden">两次输入的密码不一致</p>
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeResetPasswordModal()" class="text-gray-600 hover:text-gray-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">取消</button>
+                    <button type="submit" id="reset-submit-btn" class="bg-orange-600 hover:bg-orange-500 text-white text-sm px-5 py-2 rounded-lg font-medium transition-colors">确认重置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="delete-user-modal" class="fixed inset-0 z-50 hidden">
+    <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeDeleteModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900">删除用户</h3>
+                    <button type="button" onclick="closeDeleteModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-4">
+                <div class="flex items-start space-x-3">
+                    <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-700">确定要删除用户 <strong id="delete-user-name"></strong> 吗？</p>
+                        <p class="text-sm text-gray-500 mt-1">此操作不可恢复，该用户的所有数据将被永久删除。</p>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end space-x-3">
+                <button type="button" onclick="closeDeleteModal()" class="text-gray-600 hover:text-gray-800 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors">取消</button>
+                <form method="POST" action="/admin/delete-user" class="inline">
+                    <input type="hidden" name="user_id" id="delete-user-id" value="">
+                    <button type="submit" class="bg-red-600 hover:bg-red-500 text-white text-sm px-5 py-2 rounded-lg font-medium transition-colors">确认删除</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -132,7 +387,7 @@ function updateBatchSelect(bootcampSelect) {
     var batchSelect = form.querySelector('.batch-select');
     var bootcampId = bootcampSelect.value;
     var batches = bootcampBatches[bootcampId] || [];
-    
+
     batchSelect.innerHTML = '<option value="">无批次</option>';
     for (var i = 0; i < batches.length; i++) {
         var opt = document.createElement('option');
@@ -140,6 +395,119 @@ function updateBatchSelect(bootcampSelect) {
         opt.textContent = batches[i].name;
         batchSelect.appendChild(opt);
     }
+}
+
+function updateBatchModalSelect(bootcampSelect) {
+    var batchSelect = document.querySelector('.batch-select-modal');
+    var bootcampId = bootcampSelect.value;
+    var batches = bootcampBatches[bootcampId] || [];
+
+    batchSelect.innerHTML = '<option value="">无批次</option>';
+    for (var i = 0; i < batches.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = batches[i].id;
+        opt.textContent = batches[i].name;
+        batchSelect.appendChild(opt);
+    }
+}
+
+function toggleSelectAll(selectAllCheckbox) {
+    var checkboxes = document.querySelectorAll('input[name="user_checkbox"]');
+    checkboxes.forEach(function(cb) {
+        cb.checked = selectAllCheckbox.checked;
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    var checked = document.querySelectorAll('input[name="user_checkbox"]:checked');
+    var count = checked.length;
+    document.getElementById('selected-count').textContent = '已选 ' + count + ' 位用户';
+    var btn = document.getElementById('batch-enroll-btn');
+    if (count > 0) {
+        btn.disabled = false;
+    } else {
+        btn.disabled = true;
+    }
+}
+
+function openBatchEnrollModal() {
+    var checked = document.querySelectorAll('input[name="user_checkbox"]:checked');
+    if (checked.length === 0) return;
+    var ids = [];
+    checked.forEach(function(cb) {
+        ids.push(cb.value);
+    });
+    document.getElementById('batch-user-ids').value = ids.join(',');
+    document.getElementById('batch-enroll-count').textContent = ids.length;
+    document.getElementById('batch-enroll-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeBatchEnrollModal() {
+    document.getElementById('batch-enroll-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function openEditModal(userId, nickname, college, studentId, grade) {
+    document.getElementById('edit-user-id').value = userId;
+    document.getElementById('edit-nickname').value = nickname;
+    document.getElementById('edit-college').value = college;
+    document.getElementById('edit-student-id').value = studentId;
+    document.getElementById('edit-grade').value = grade;
+    document.getElementById('edit-user-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-user-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function openResetPasswordModal(userId, nickname) {
+    document.getElementById('reset-user-id').value = userId;
+    document.getElementById('reset-user-name').textContent = nickname;
+    document.getElementById('password-match-msg').classList.add('hidden');
+    var form = document.getElementById('reset-password-modal').querySelector('form');
+    form.reset();
+    document.getElementById('reset-user-id').value = userId;
+    document.getElementById('reset-password-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeResetPasswordModal() {
+    document.getElementById('reset-password-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function checkPasswordMatch() {
+    var form = document.getElementById('reset-password-modal').querySelector('form');
+    var pwd = form.querySelector('input[name="new_password"]').value;
+    var confirm = form.querySelector('input[name="confirm_password"]').value;
+    var msg = document.getElementById('password-match-msg');
+    if (confirm && pwd !== confirm) {
+        msg.classList.remove('hidden');
+    } else {
+        msg.classList.add('hidden');
+    }
+}
+
+function confirmDeleteUser(userId, nickname) {
+    if (!confirm('确定要删除用户 "' + nickname + '" 吗？此操作不可恢复。')) return;
+    document.getElementById('delete-user-id').value = userId;
+    document.getElementById('delete-user-name').textContent = nickname;
+    document.getElementById('delete-user-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-user-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function closeCreateUserModal() {
+    document.getElementById('createUserModal').classList.add('hidden');
+    document.body.style.overflow = '';
 }
 
 document.addEventListener('DOMContentLoaded', function() {
