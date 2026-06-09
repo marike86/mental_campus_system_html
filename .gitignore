@@ -1,0 +1,28 @@
+# Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 敏感文件（密钥绝不能提交）
+*.secret_key
+*.jwt_secret_key
+.secret_key
+.jwt_secret_key
+
+# 数据库文件
+*.db
+*.sqlite3
+
+# 虚拟环境
+venv/
+.env
+.env.*
+
+# 临时文件
+*.tmp
+*.log
+
+# IDE配置
+.idea/
+.vscode/
+.trae/

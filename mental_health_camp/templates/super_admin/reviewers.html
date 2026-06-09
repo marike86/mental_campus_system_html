@@ -119,6 +119,7 @@
                                     <a href="/super-admin/reviewer/{{ stat.reviewer.id }}" class="text-brand-600 hover:text-brand-900">详情</a>
                                     <a href="/super-admin/reviewer/{{ stat.reviewer.id }}/edit" class="text-blue-600 hover:text-blue-900">编辑</a>
                                     <form action="/super-admin/reviewer/{{ stat.reviewer.id }}/toggle" method="POST" class="inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                                         {% if stat.reviewer.is_active %}
                                         <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('确定要禁用此审核员吗？')">禁用</button>
                                         {% else %}
@@ -203,6 +204,7 @@
                         编辑
                     </a>
                     <form action="/super-admin/reviewer/{{ stat.reviewer.id }}/toggle" method="POST" class="flex-1">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                         {% if stat.reviewer.is_active %}
                         <button type="submit" class="w-full py-2.5 min-h-[44px] text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors" onclick="return confirm('确定要禁用此审核员吗？')">禁用</button>
                         {% else %}

@@ -73,6 +73,7 @@
                         <div class="flex items-center justify-end space-x-2">
                             <a href="/admin/bootcamp/{{ b.id }}" class="text-brand-800 hover:text-brand-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors">编辑</a>
                             <form method="POST" action="/admin/bootcamp/{{ b.id }}/toggle" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                                 {% if b.is_active %}
                                 <button type="submit" class="text-orange-600 hover:text-orange-700 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-orange-50 transition-colors">下线</button>
                                 {% else %}
@@ -107,6 +108,7 @@
             <div class="flex items-center space-x-2">
                 <a href="/admin/bootcamp/{{ b.id }}" class="flex-1 text-center bg-brand-50 hover:bg-brand-100 text-brand-800 py-2 rounded-lg text-sm font-medium transition-colors">编辑</a>
                 <form method="POST" action="/admin/bootcamp/{{ b.id }}/toggle" class="flex-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                     {% if b.is_active %}
                     <button type="submit" class="w-full bg-orange-50 hover:bg-orange-100 text-orange-600 py-2 rounded-lg text-sm font-medium transition-colors">下线</button>
                     {% else %}

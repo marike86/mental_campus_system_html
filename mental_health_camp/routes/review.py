@@ -10,7 +10,7 @@ from models.enrollment import Enrollment
 from models.bootcamp import Bootcamp
 from models.day_form import DayForm
 from models.review_assignment import ReviewAssignment
-from auth import require_reviewer
+from auth import require_reviewer, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import decrypt_data
@@ -98,7 +98,7 @@ async def review_detail(request: Request, submission_id: int, reviewer: User = D
 
 
 @router.post("/review/{submission_id}/approve")
-async def approve_submission(request: Request, submission_id: int, reviewer: User = Depends(require_reviewer), db: Session = Depends(get_db)):
+async def approve_submission(request: Request, submission_id: int, reviewer: User = Depends(require_reviewer), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """审核通过"""
     try:
         submission = db.query(Submission).filter(Submission.id == submission_id).first()
@@ -130,7 +130,7 @@ async def approve_submission(request: Request, submission_id: int, reviewer: Use
 
 
 @router.post("/review/{submission_id}/reject")
-async def reject_submission(request: Request, submission_id: int, reviewer: User = Depends(require_reviewer), db: Session = Depends(get_db)):
+async def reject_submission(request: Request, submission_id: int, reviewer: User = Depends(require_reviewer), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """审核不通过"""
     try:
         submission = db.query(Submission).filter(Submission.id == submission_id).first()

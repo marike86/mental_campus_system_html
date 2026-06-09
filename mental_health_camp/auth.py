@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import Depends, HTTPException, status, Response, Request
+from fastapi import Depends, HTTPException, status, Response, Request, Form
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -9,6 +9,7 @@ from passlib.context import CryptContext
 from database import get_db
 from models.user import User
 from config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+from utils.csrf import validate_csrf_token
 
 logger = logging.getLogger(__name__)
 
@@ -96,3 +97,18 @@ async def get_optional_user(request: Request, db: Session = Depends(get_db)) -> 
     if user_id is None:
         return None
     return db.query(User).filter(User.id == user_id).first()
+
+
+async def verify_csrf(request: Request, csrf_token: str = Form("")) -> None:
+    """CSRF验证依赖，用于POST路由
+
+    在路由函数参数中添加 csrf_token: str = Form(...) 和此依赖即可启用CSRF防护。
+    """
+    import secrets as _secrets
+    cookie_token = request.cookies.get("csrf_token", "")
+    if not cookie_token:
+        logger.warning("CSRF验证失败：cookie中无token [path=%s]", request.url.path)
+        raise HTTPException(status_code=403, detail="CSRF token缺失")
+    if not _secrets.compare_digest(cookie_token, csrf_token):
+        logger.warning("CSRF验证失败：token不匹配 [path=%s]", request.url.path)
+        raise HTTPException(status_code=403, detail="CSRF token无效")

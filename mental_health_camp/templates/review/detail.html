@@ -108,6 +108,7 @@
             </form>
 
             <form method="POST" action="/review/{{ submission.id }}/reject" class="sm:flex-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">不通过原因（可选）</label>
                     <textarea name="comment" rows="3" placeholder="请输入不通过的原因，以便用户修改后重新提交..."

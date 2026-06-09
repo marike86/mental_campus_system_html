@@ -4,6 +4,7 @@ from config import (
     APP_NAME, PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR,
     PRIMARY_BG, PRIMARY_TEXT, PRIMARY_BTN, NAV_BG
 )
+from utils.csrf import get_or_create_csrf_token
 
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 _jinja2_templates = Jinja2Templates(directory=templates_dir)
@@ -17,6 +18,7 @@ context_processors = {
     "PRIMARY_TEXT": PRIMARY_TEXT,
     "PRIMARY_BTN": PRIMARY_BTN,
     "NAV_BG": NAV_BG,
+    "csrf_token": get_or_create_csrf_token,
 }
 
 _jinja2_templates.env.globals.update(context_processors)

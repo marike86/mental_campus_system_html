@@ -4,8 +4,9 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
-from auth import verify_password, get_password_hash, create_access_token, get_current_user, get_optional_user
+from auth import verify_password, get_password_hash, create_access_token, get_current_user, get_optional_user, verify_csrf
 from config import APP_NAME, DEBUG
+from utils.sanitize import sanitize_text, sanitize_email, validate_password_strength
 from templates_config import templates
 
 router = APIRouter(tags=["auth"])
@@ -26,6 +27,7 @@ async def login_submit(
     email: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db),
+    _csrf: None = Depends(verify_csrf),
 ):
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(password, user.hashed_password):
@@ -67,7 +69,28 @@ async def register_submit(
     student_id: str = Form(""),
     grade: str = Form(""),
     db: Session = Depends(get_db),
+    _csrf: None = Depends(verify_csrf),
 ):
+    # 输入清理
+    email = sanitize_email(email)
+    if not email:
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "app_name": APP_NAME,
+            "error": "邮箱格式不正确",
+        })
+    nickname = sanitize_text(nickname)
+    college = sanitize_text(college)
+    student_id = sanitize_text(student_id)
+    grade = sanitize_text(grade)
+    # 密码强度验证
+    pwd_valid, pwd_error = validate_password_strength(password)
+    if not pwd_valid:
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "app_name": APP_NAME,
+            "error": pwd_error,
+        })
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         return templates.TemplateResponse("register.html", {

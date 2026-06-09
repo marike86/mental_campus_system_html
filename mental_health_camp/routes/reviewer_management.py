@@ -8,7 +8,7 @@ from database import get_db
 from models.user import User
 from models.submission import Submission
 from models.review_assignment import ReviewAssignment
-from auth import require_super_admin, get_password_hash
+from auth import require_super_admin, get_password_hash, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from routes.audit import log_admin_action
@@ -73,7 +73,7 @@ async def new_reviewer_page(request: Request, admin: User = Depends(require_supe
 
 
 @router.post("/super-admin/reviewer/new")
-async def create_reviewer(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
+async def create_reviewer(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """创建审核员"""
     try:
         form_data = await request.form()
@@ -362,7 +362,7 @@ async def assign_review_task(request: Request, admin: User = Depends(require_sup
 
 
 @router.post("/super-admin/auto-assign")
-async def auto_assign_tasks(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
+async def auto_assign_tasks(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """智能自动分配审核任务"""
     try:
         # 获取所有待审核且未分配的提交

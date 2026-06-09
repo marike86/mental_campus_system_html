@@ -99,6 +99,7 @@
                     
                     {% if active_reviewers %}
                     <form action="/super-admin/assign" method="POST" class="flex items-center space-x-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                         <input type="hidden" name="submission_id" value="{{ submission.id }}">
                         <select name="reviewer_id" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" required>
                             <option value="">选择审核员</option>

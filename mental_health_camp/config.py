@@ -4,14 +4,30 @@ import secrets
 # ===== 应用基础配置 =====
 APP_NAME = "心理健康训练营"          # 应用/品牌名称，显示在页面标题和导航栏
 APP_DESCRIPTION = "每日心理评估，记录你的成长旅程"  # 应用描述，显示在首页
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))  # FastAPI安全密钥
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"  # 调试模式开关
+
+
+def _load_or_generate_key(env_var: str, key_file: str) -> str:
+    """加载或生成密钥，优先使用环境变量，其次从文件读取，最后自动生成并保存"""
+    key = os.getenv(env_var)
+    if key:
+        return key
+    if os.path.exists(key_file):
+        with open(key_file, "r") as f:
+            return f.read().strip()
+    key = secrets.token_hex(32)
+    with open(key_file, "w") as f:
+        f.write(key)
+    return key
+
+
+SECRET_KEY = _load_or_generate_key("SECRET_KEY", ".secret_key")  # FastAPI安全密钥
 
 # ===== 数据库配置 =====
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mental_health_camp.db")  # 数据库连接URL
 
 # ===== JWT认证配置 =====
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_hex(32))  # JWT签名密钥
+JWT_SECRET_KEY = _load_or_generate_key("JWT_SECRET_KEY", ".jwt_secret_key")  # JWT签名密钥
 JWT_ALGORITHM = "HS256"              # JWT加密算法
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  # JWT令牌过期时间
 

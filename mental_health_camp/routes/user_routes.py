@@ -11,10 +11,11 @@ from models.enrollment import Enrollment
 from models.submission import Submission
 from models.badge import Badge
 from models.user_badge import UserBadge
-from auth import get_current_user, get_password_hash, verify_password
+from auth import get_current_user, get_password_hash, verify_password, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import encrypt_data, decrypt_data
+from utils.sanitize import sanitize_text, validate_password_strength
 
 import logging
 
@@ -106,7 +107,7 @@ async def fill_form(request: Request, enrollment_id: int, day: int, current_user
 
 
 @router.post("/form/{enrollment_id}/{day}")
-async def submit_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def submit_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id, Enrollment.user_id == current_user.id).first()
     if not enrollment:
         raise HTTPException(status_code=404, detail="训练营不存在")
@@ -171,7 +172,7 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
 
 
 @router.post("/api/verify-answer")
-async def verify_answer(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def verify_answer(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         body = await request.json()
         enrollment_id = body.get("enrollment_id")
@@ -239,7 +240,7 @@ async def browse_bootcamps(request: Request, current_user: User = Depends(get_cu
 
 
 @router.post("/bootcamp/{bootcamp_id}/join")
-async def join_bootcamp(request: Request, bootcamp_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def join_bootcamp(request: Request, bootcamp_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id, Bootcamp.is_active == True).first()
         if not bootcamp:
@@ -315,17 +316,25 @@ async def profile_page(request: Request, current_user: User = Depends(get_curren
 
 
 @router.post("/profile")
-async def update_profile(request: Request, nickname: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def update_profile(request: Request, nickname: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
+    nickname = sanitize_text(nickname)
+    if not nickname:
+        return RedirectResponse("/user/profile", status_code=302)
     current_user.nickname = nickname
     db.commit()
     return RedirectResponse("/user/profile", status_code=302)
 
 
 @router.post("/password")
-async def update_password(request: Request, current_password: str = Form(...), new_password: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def update_password(request: Request, current_password: str = Form(...), new_password: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     if not verify_password(current_password, current_user.hashed_password):
         return templates.TemplateResponse("user/dashboard.html", {
             "request": request, "user": current_user, "app_name": APP_NAME, "show_profile": True, "pwd_error": "当前密码错误",
+        })
+    pwd_valid, pwd_error = validate_password_strength(new_password)
+    if not pwd_valid:
+        return templates.TemplateResponse("user/dashboard.html", {
+            "request": request, "user": current_user, "app_name": APP_NAME, "show_profile": True, "pwd_error": pwd_error,
         })
     current_user.hashed_password = get_password_hash(new_password)
     db.commit()
@@ -351,7 +360,7 @@ async def badges_page(request: Request, current_user: User = Depends(get_current
 
 
 @router.post("/notification-toggle")
-async def notification_toggle(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def notification_toggle(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     current_user.notification_enabled = not current_user.notification_enabled
     db.commit()
     return RedirectResponse("/user/profile", status_code=302)

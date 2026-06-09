@@ -114,6 +114,7 @@
         </div>
         {% endif %}
         <form id="form-{{ enrollment.id }}" method="POST" action="/user/form/{{ enrollment.id }}/{{ day_number }}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             {% for q in day_form.questions %}
             <div data-question-id="{{ q.id }}" class="border border-gray-200 rounded-xl p-5 hover:border-brand-200 transition-colors">
                 <label class="block text-sm font-medium text-gray-700 mb-3">

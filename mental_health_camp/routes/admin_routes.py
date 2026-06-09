@@ -18,10 +18,11 @@ from models.submission import Submission
 from models.batch import Batch
 from models.audit_log import AuditLog
 from models.user_badge import UserBadge
-from auth import require_admin, get_password_hash
+from auth import require_admin, get_password_hash, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import decrypt_data
+from utils.sanitize import sanitize_text, sanitize_email, validate_password_strength
 from routes.audit import log_admin_action
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ async def new_bootcamp_page(request: Request, admin: User = Depends(require_admi
 
 
 @router.post("/admin/bootcamp/new")
-async def create_bootcamp(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def create_bootcamp(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     form_data = await request.form()
     name = form_data.get("name", "").strip()
     description = form_data.get("description", "").strip()
@@ -85,7 +86,7 @@ async def bootcamp_detail(request: Request, bootcamp_id: int, admin: User = Depe
 
 
 @router.post("/admin/bootcamp/{bootcamp_id}")
-async def update_bootcamp(request: Request, bootcamp_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def update_bootcamp(request: Request, bootcamp_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
     if not bootcamp:
         raise HTTPException(status_code=404, detail="训练营不存在")
@@ -116,7 +117,7 @@ async def edit_day_form(request: Request, bootcamp_id: int, day: int, admin: Use
 
 
 @router.post("/admin/bootcamp/{bootcamp_id}/day/{day}")
-async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     day_form = db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp_id, DayForm.day_number == day).first()
     if not day_form:
         raise HTTPException(status_code=404, detail="表单不存在")
@@ -132,7 +133,7 @@ async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: Use
 
 
 @router.post("/admin/bootcamp/{bootcamp_id}/toggle")
-async def toggle_bootcamp(bootcamp_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def toggle_bootcamp(bootcamp_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
     if not bootcamp:
         raise HTTPException(status_code=404, detail="训练营不存在")
@@ -165,7 +166,7 @@ async def admin_users(request: Request, admin: User = Depends(require_admin), db
 
 
 @router.post("/admin/enroll")
-async def enroll_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def enroll_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     form_data = await request.form()
     user_id_str = form_data.get("user_id", "")
     bootcamp_id_str = form_data.get("bootcamp_id", "")
@@ -204,7 +205,7 @@ async def export_page(request: Request, admin: User = Depends(require_admin), db
 
 
 @router.post("/admin/export")
-async def export_csv(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def export_csv(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         bootcamp_id_str = form_data.get("bootcamp_id", "")
@@ -391,7 +392,7 @@ async def admin_batches(request: Request, admin: User = Depends(require_admin), 
 
 
 @router.post("/admin/batch/new")
-async def create_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def create_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     form_data = await request.form()
     bootcamp_id_str = form_data.get("bootcamp_id", "")
     if not bootcamp_id_str:
@@ -430,7 +431,7 @@ async def create_batch(request: Request, admin: User = Depends(require_admin), d
 
 
 @router.post("/admin/view-user-data")
-async def view_user_data(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def view_user_data(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     form_data = await request.form()
     user_id_str = form_data.get("user_id", "")
     if not user_id_str:
@@ -444,7 +445,7 @@ async def view_user_data(request: Request, admin: User = Depends(require_admin),
 
 
 @router.post("/admin/batch-enroll")
-async def batch_enroll_users(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def batch_enroll_users(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         bootcamp_id_str = form_data.get("bootcamp_id", "")
@@ -507,7 +508,7 @@ async def batch_enroll_users(request: Request, admin: User = Depends(require_adm
 
 
 @router.post("/admin/reset-password")
-async def admin_reset_password(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_reset_password(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         user_id_str = form_data.get("user_id", "")
@@ -520,6 +521,9 @@ async def admin_reset_password(request: Request, admin: User = Depends(require_a
             raise HTTPException(status_code=400, detail="用户ID必须为数字")
         if not new_password or len(new_password) < 6:
             raise HTTPException(status_code=400, detail="新密码长度不能少于6位")
+        pwd_valid, pwd_error = validate_password_strength(new_password)
+        if not pwd_valid:
+            raise HTTPException(status_code=400, detail=pwd_error)
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
@@ -535,7 +539,7 @@ async def admin_reset_password(request: Request, admin: User = Depends(require_a
 
 
 @router.post("/admin/delete-user")
-async def admin_delete_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_delete_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         user_id_str = form_data.get("user_id", "")
@@ -573,7 +577,7 @@ async def admin_delete_user(request: Request, admin: User = Depends(require_admi
 
 
 @router.post("/admin/create-user")
-async def admin_create_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_create_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         email = form_data.get("email", "").strip()
@@ -583,14 +587,29 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
         college = form_data.get("college", "").strip()
         student_id = form_data.get("student_id", "").strip()
         grade = form_data.get("grade", "").strip()
+        email = sanitize_email(email)
+        if not email:
+            raise HTTPException(status_code=400, detail="邮箱格式不正确")
+        nickname = sanitize_text(nickname)
+        college = sanitize_text(college)
+        student_id = sanitize_text(student_id)
+        grade = sanitize_text(grade)
+        pwd_valid, pwd_error = validate_password_strength(password)
+        if not pwd_valid:
+            raise HTTPException(status_code=400, detail=pwd_error)
         if not email:
             raise HTTPException(status_code=400, detail="邮箱不能为空")
         if not nickname:
             raise HTTPException(status_code=400, detail="昵称不能为空")
         if not password or len(password) < 6:
             raise HTTPException(status_code=400, detail="密码长度不能少于6位")
-        if role not in ("user", "admin", "reviewer"):
-            raise HTTPException(status_code=400, detail="角色必须为 user、admin 或 reviewer")
+        # 权限控制：只有超级管理员可以创建admin角色
+        if admin.role == "super_admin":
+            allowed_roles = ("user", "admin", "reviewer")
+        else:
+            allowed_roles = ("user", "reviewer")
+        if role not in allowed_roles:
+            raise HTTPException(status_code=403, detail="无权创建该角色的用户")
         existing = db.query(User).filter(User.email == email).first()
         if existing:
             raise HTTPException(status_code=400, detail="该邮箱已被注册")
@@ -615,7 +634,7 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
 
 
 @router.post("/admin/enrollment/{enrollment_id}/approve")
-async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
         if not enrollment:
@@ -633,7 +652,7 @@ async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_a
 
 
 @router.post("/admin/enrollment/{enrollment_id}/reject")
-async def reject_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def reject_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
         if not enrollment:
@@ -650,7 +669,7 @@ async def reject_enrollment(enrollment_id: int, admin: User = Depends(require_ad
 
 
 @router.post("/admin/edit-user")
-async def admin_edit_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_edit_user(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         user_id_str = form_data.get("user_id", "")
@@ -664,12 +683,16 @@ async def admin_edit_user(request: Request, admin: User = Depends(require_admin)
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         nickname = form_data.get("nickname", "").strip()
+        nickname = sanitize_text(nickname)
         if not nickname:
             raise HTTPException(status_code=400, detail="昵称不能为空")
         user.nickname = nickname
-        user.student_id = form_data.get("student_id", "").strip() or None
-        user.college = form_data.get("college", "").strip() or None
-        user.grade = form_data.get("grade", "").strip() or None
+        student_id = sanitize_text(form_data.get("student_id", "").strip())
+        college = sanitize_text(form_data.get("college", "").strip())
+        grade = sanitize_text(form_data.get("grade", "").strip())
+        user.student_id = student_id or None
+        user.college = college or None
+        user.grade = grade or None
         db.commit()
         log_admin_action(db, admin.id, "编辑用户信息", "user", user_id, {"nickname": nickname})
         return RedirectResponse("/admin/users", status_code=302)
@@ -681,7 +704,7 @@ async def admin_edit_user(request: Request, admin: User = Depends(require_admin)
 
 
 @router.post("/admin/batch/edit")
-async def admin_edit_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_edit_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         batch_id_str = form_data.get("batch_id", "")
@@ -728,7 +751,7 @@ async def admin_edit_batch(request: Request, admin: User = Depends(require_admin
 
 
 @router.post("/admin/batch/delete")
-async def admin_delete_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_delete_batch(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         batch_id_str = form_data.get("batch_id", "")
@@ -761,7 +784,7 @@ async def admin_delete_batch(request: Request, admin: User = Depends(require_adm
 
 
 @router.post("/admin/batch/batch-delete")
-async def admin_batch_delete_batches(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+async def admin_batch_delete_batches(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
         form_data = await request.form()
         batch_ids_str = form_data.get("batch_ids", "")
