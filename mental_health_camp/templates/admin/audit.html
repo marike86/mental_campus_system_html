@@ -7,6 +7,7 @@
         <p class="text-gray-500 mt-1">管理员操作记录（共 {{ total }} 条）</p>
     </div>
 
+    <form method="get" class="flex flex-wrap gap-2">{% for key,label in [('admin_id','操作者ID'),('event_type','事件类型'),('target_type','目标类型'),('target_id','目标ID'),('camp_id','训练营ID'),('batch_id','批次ID'),('operation_id','批量操作编号'),('start','开始日期'),('end','结束日期')] %}<label>{{label}} <input class="border rounded p-2 max-w-full" name="{{key}}" value="{{request.query_params.get(key,'')}}" {% if key in ['start','end'] %}type="date"{% endif %}></label>{% endfor %}<button>筛选</button></form>
     {% if logs %}
     <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div class="hidden md:block overflow-x-auto">
@@ -31,14 +32,14 @@
                             <span class="text-sm font-medium text-gray-900">{{ admin_map.get(log.admin_id, '未知') }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            <span class="break-all whitespace-normal inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 {% if '查看' in log.action %}bg-blue-100 text-blue-700
                                 {% elif '导出' in log.action %}bg-orange-100 text-orange-700
                                 {% elif '创建' in log.action %}bg-green-100 text-green-700
                                 {% elif '修改' in log.action %}bg-yellow-100 text-yellow-700
                                 {% elif '分配' in log.action %}bg-purple-100 text-purple-700
                                 {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                {{ log.action }}
+                                {{ log.action }} · {{log.event_type or "暂无数据"}} · {{log.actor_role or "暂无数据"}} · {{log.operation_id or ""}}
                             </span>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ log.target_type }}</td>
@@ -60,7 +61,7 @@
             {% for log in logs %}
             <div class="px-4 py-3">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="text-sm font-medium text-gray-900">{{ log.action }}</span>
+                    <span class="text-sm font-medium text-gray-900">{{ log.action }} · {{log.event_type or "暂无数据"}} · {{log.actor_role or "暂无数据"}} · {{log.operation_id or ""}}</span>
                     <span class="text-xs text-gray-400">{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '' }}</span>
                 </div>
                 <p class="text-xs text-gray-500">{{ admin_map.get(log.admin_id, '未知') }} · {{ log.target_type }} {{ '#' ~ log.target_id if log.target_id else '' }}</p>
@@ -72,11 +73,11 @@
     {% if total_pages > 1 %}
     <div class="flex items-center justify-center space-x-2">
         {% if page > 1 %}
-        <a href="?page={{ page - 1 }}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">上一页</a>
+        <a href="{{request.url.include_query_params(page=page-1)}}" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">上一页</a>
         {% endif %}
         <span class="text-sm text-gray-500">第 {{ page }} / {{ total_pages }} 页</span>
         {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}" class="px-3 py-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">下一页</a>
+        <a href="{{request.url.include_query_params(page=page+1)}}" class="px-3 py-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-sm font-medium text-gray-600 hover:text-brand-800 rounded-lg hover:bg-brand-50 transition-colors">下一页</a>
         {% endif %}
     </div>
     {% endif %}

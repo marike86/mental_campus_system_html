@@ -1,0 +1,9 @@
+<section id="bulk-controls" class="bg-white rounded p-4 mb-4 space-y-3">
+<input type="hidden" id="bulk-csrf" value="{{csrf_token(request)}}">
+<label><input type="checkbox" id="bulk-all"> 选择当前页</label>
+<select id="bulk-action" class="border p-2"><option value="{{bulk_action}}">{{bulk_label}}</option>{% if bulk_action=='assign' %}<option value="transfer">批量转交</option>{% endif %}</select>
+{% if reviewers %}<label>接收审核员 <select id="bulk-reviewer" class="border p-2">{% for r in reviewers %}<option value="{{r.id}}">{{r.nickname}}（容量 {{r.max_concurrent_tasks}}）</option>{% endfor %}</select></label>{% endif %}
+<button type="button" id="bulk-preview" class="border p-2 rounded">预览所选操作</button>
+<pre id="bulk-summary" class="whitespace-pre-wrap break-all" aria-live="polite"></pre>
+<button type="button" id="bulk-confirm" class="border p-2 rounded" hidden>确认整批执行</button>
+</section><script src="/static/js/bulk.js" defer></script>

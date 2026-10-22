@@ -9,7 +9,7 @@ from models import user, bootcamp, day_form, enrollment, submission, batch, badg
 from models.workflow import WorkflowSchema, DayFormVersion, EnrollmentDay, SubmissionAttempt
 from services.clock import now
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def preflight(connection):
@@ -38,7 +38,7 @@ def migrate(backup_path=None):
             installed = connection.execute(text("SELECT version FROM workflow_schema WHERE id=1")).scalar()
             if installed == SCHEMA_VERSION:
                 return False
-            if installed not in (None, 1):
+            if installed not in (None, 1, 2):
                 raise RuntimeError("不支持的数据库版本")
     if tables and engine.url.database not in (None, ":memory:"):
         destination = Path(backup_path or (str(engine.url.database) + now().strftime('.%Y%m%d%H%M%S.backup')))
@@ -47,6 +47,7 @@ def migrate(backup_path=None):
         with sqlite3.connect(engine.url.database) as source, sqlite3.connect(destination) as target:
             source.backup(target)
     additions = {
+        "audit_logs": {"event_type":"VARCHAR", "actor_role":"VARCHAR", "operation_id":"VARCHAR", "camp_id":"INTEGER", "batch_id":"INTEGER"},
         "users": {"specialty": "VARCHAR", "is_active": "BOOLEAN DEFAULT 1", "max_concurrent_tasks": "INTEGER DEFAULT 10"},
         "enrollments": {"status": "VARCHAR DEFAULT 'approved' NOT NULL"},
         "submissions": {"review_status": "VARCHAR DEFAULT 'approved' NOT NULL", "reviewer_id": "INTEGER", "review_comment": "TEXT", "reviewed_at": "DATETIME", "current_attempt_id": "INTEGER REFERENCES submission_attempts(id)"},
@@ -61,6 +62,8 @@ def migrate(backup_path=None):
                 if name not in existing:
                     connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
         Base.metadata.create_all(connection)
+        for column in ("event_type","operation_id","camp_id","batch_id"):
+            connection.execute(text(f"CREATE INDEX IF NOT EXISTS ix_audit_logs_{column} ON audit_logs({column})"))
         # Existing SQLite tables need indexes added explicitly.
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_day ON submissions(enrollment_id,day_number)"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_enrollment_camp ON enrollments(user_id,bootcamp_id)"))

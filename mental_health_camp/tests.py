@@ -1503,12 +1503,12 @@ class TestAuditLog:
         try:
             admin = _create_admin(db)
             from routes.audit import log_admin_action
-            log_admin_action(db, admin.id, "测试操作", "test", 1, {"key": "value"})
+            log_admin_action(db, admin.id, "测试操作", "test", 1, {"version": 1})
             log_entry = db.query(AuditLog).filter(AuditLog.action == "测试操作").first()
             assert log_entry is not None
             assert log_entry.admin_id == admin.id
             assert log_entry.target_type == "test"
-            assert log_entry.detail == {"key": "value"}
+            assert log_entry.detail == {"version": 1}
         finally:
             db.close()
 
@@ -2526,13 +2526,13 @@ class TestModelFields:
         try:
             admin = _create_admin(db)
             from routes.audit import log_admin_action
-            log_admin_action(db, admin.id, "测试", "target", 1, {"k": "v"})
+            log_admin_action(db, admin.id, "测试", "target", 1, {"version": 1})
             log_entry = db.query(AuditLog).filter(AuditLog.action == "测试").first()
             assert log_entry is not None
             assert log_entry.admin_id == admin.id
             assert log_entry.target_type == "target"
             assert log_entry.target_id == 1
-            assert log_entry.detail == {"k": "v"}
+            assert log_entry.detail == {"version": 1}
             assert log_entry.created_at is not None
         finally:
             db.close()

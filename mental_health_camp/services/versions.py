@@ -61,6 +61,8 @@ def publish(db, day_form, admin_id):
                              questions=copy.deepcopy(day_form.questions), published_by=admin_id, published_at=now())
     db.add(version)
     db.flush()
+    from services.audit import record
+    record(db, admin_id, "发布表单", "day_form", day_form.id, {"version":version.version}, event_type="form.publish", camp_id=day_form.bootcamp_id)
     return version
 
 

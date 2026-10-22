@@ -114,11 +114,12 @@ async def create_reviewer(request: Request, admin: User = Depends(require_super_
             is_active=True,
         )
         db.add(reviewer)
-        db.commit()
+        db.flush()
         
         log_admin_action(db, admin.id, "创建审核员", "user", reviewer.id, {
             "email": email, "nickname": nickname, "specialty": specialty
         })
+        db.commit()
         return RedirectResponse("/super-admin/reviewers", status_code=302)
     except HTTPException:
         raise
@@ -216,11 +217,12 @@ async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depe
         if new_password and len(new_password) >= 6:
             reviewer.hashed_password = get_password_hash(new_password)
         
-        db.commit()
+        db.flush()
         
         log_admin_action(db, admin.id, "编辑审核员", "user", reviewer_id, {
             "nickname": nickname, "specialty": specialty
         })
+        db.commit()
         return RedirectResponse(f"/super-admin/reviewer/{reviewer_id}", status_code=302)
     except HTTPException:
         raise
@@ -241,11 +243,12 @@ async def toggle_reviewer(request: Request, reviewer_id: int, admin: User = Depe
         db.refresh(reviewer)
         reviewer.is_active = not reviewer.is_active
         if not reviewer.is_active:
-            reviews.release_reviewer(db, reviewer.id)
-        db.commit()
+            reviews.release_reviewer(db, reviewer.id, admin.id)
+        db.flush()
         
         action = "启用审核员" if reviewer.is_active else "禁用审核员"
         log_admin_action(db, admin.id, action, "user", reviewer_id)
+        db.commit()
         return RedirectResponse("/super-admin/reviewers", status_code=302)
     except HTTPException:
         raise
