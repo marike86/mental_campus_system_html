@@ -38,6 +38,7 @@
             questions: {{ questions_json | tojson }},
             enrollmentId: {{ enrollment.id }},
             dayNumber: {{ day_number }},
+            csrfToken: {{ csrf_token(request) | tojson }},
             formAction: '/user/form/{{ enrollment.id }}/{{ day_number }}'
         });
     });

@@ -115,10 +115,12 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
     # 如果已通过或待审核，不允许重新提交
     if existing and existing.review_status != "rejected":
         return RedirectResponse(f"/user/form/{enrollment_id}/{day}", status_code=302)
-    # 如果是被拒绝的提交，删除旧记录以便重新提交
-    if existing and existing.review_status == "rejected":
-        db.delete(existing)
-        db.commit()
+    day_form = db.query(DayForm).filter(
+        DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == day
+    ).first()
+    bootcamp = db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first()
+    if not day_form or not bootcamp or day < 1 or day > bootcamp.days:
+        raise HTTPException(status_code=404, detail="表单不存在")
     # 检查是否需要按顺序提交
     if day > 1:
         prev_submission = db.query(Submission).filter(
@@ -129,14 +131,8 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
         if not prev_submission:
             raise HTTPException(status_code=400, detail="请先完成并等待通过前一天的表单")
     # 检查必填项
-    day_form = db.query(DayForm).filter(
-        DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == day
-    ).first()
     form_data = await request.form()
     answers = {}
-    for key, value in form_data.multi_items():
-        if key.startswith("q_"):
-            answers[key] = value
     if day_form:
         for q in day_form.questions:
             qid = q["id"]
@@ -144,14 +140,19 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
                 answers[qid] = form_data.getlist(f"q_{qid}")
             elif q["type"] == "likert":
                 val = form_data.get(f"q_{qid}")
-                answers[qid] = int(val) if val else None
+                try:
+                    answers[qid] = int(val) if val else None
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="量表答案必须为整数")
+                if answers[qid] is not None and not q.get("min", 1) <= answers[qid] <= q.get("max", 5):
+                    raise HTTPException(status_code=400, detail="量表答案超出范围")
             else:
                 if qid not in answers:
                     answers[qid] = form_data.get(f"q_{qid}", "")
             # 验证必填项
             if q.get("required") and q["type"] != "reading":
                 answer = answers.get(qid)
-                if not answer or (isinstance(answer, str) and not answer.strip()) or (isinstance(answer, list) and len(answer) == 0):
+                if answer is None or answer == "" or (isinstance(answer, str) and not answer.strip()) or (isinstance(answer, list) and len(answer) == 0):
                     return templates.TemplateResponse("user/form.html", {
                         "request": request, "user": current_user, "app_name": APP_NAME,
                         "enrollment": enrollment, "bootcamp": db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first(),
@@ -159,13 +160,27 @@ async def submit_form(request: Request, enrollment_id: int, day: int, current_us
                         "error": f"题目「{q.get('label', '')}」为必填项",
                     })
     encrypted_answers = encrypt_data(answers)
-    submission = Submission(
-        enrollment_id=enrollment_id,
-        day_number=day,
-        answers=encrypted_answers,
-        review_status="pending"
-    )
-    db.add(submission)
+    if existing:
+        # 保留记录 ID 和任务关联，所有校验成功后才更新旧答案。
+        from datetime import datetime, timezone
+        from models.review_assignment import ReviewAssignment
+        existing.answers = encrypted_answers
+        existing.review_status = "pending"
+        existing.reviewer_id = None
+        existing.review_comment = None
+        existing.reviewed_at = None
+        existing.submitted_at = datetime.now(timezone.utc)
+        db.query(ReviewAssignment).filter(
+            ReviewAssignment.submission_id == existing.id,
+            ReviewAssignment.status == "pending",
+        ).update({"status": "expired"}, synchronize_session=False)
+    else:
+        db.add(Submission(
+            enrollment_id=enrollment_id,
+            day_number=day,
+            answers=encrypted_answers,
+            review_status="pending"
+        ))
     db.commit()
     _check_and_award_badges(db, current_user, enrollment)
     return RedirectResponse(f"/user/history/{enrollment_id}", status_code=302)
@@ -299,6 +314,8 @@ async def history(request: Request, enrollment_id: int, current_user: User = Dep
             "id": s.id,
             "day_number": s.day_number,
             "submitted_at": s.submitted_at,
+            "review_status": s.review_status,
+            "review_comment": s.review_comment,
             "answers": decrypted_answers
         }
         records.append({"submission": record_submission, "day_form": df})

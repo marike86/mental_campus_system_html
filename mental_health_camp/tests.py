@@ -1,7 +1,12 @@
 import os
 import sys
+import atexit
+import tempfile
+from pathlib import Path
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test Mental_health_camp.db")
+# 每次测试使用独立数据库，避免旧表结构以及外部 DATABASE_URL 影响测试。
+_test_directory = tempfile.TemporaryDirectory(prefix="mental-camp-tests-")
+os.environ["DATABASE_URL"] = "sqlite:///" + (Path(_test_directory.name) / "test.db").as_posix()
 os.environ.setdefault("DEBUG", "True")
 
 from datetime import date, datetime, timedelta, timezone
@@ -10,6 +15,7 @@ from fastapi.testclient import TestClient
 from passlib.context import CryptContext
 from jose import jwt as jose_jwt
 from database import init_db, get_db, SessionLocal, engine, Base
+atexit.register(engine.dispose)
 from models.user import User
 from models.bootcamp import Bootcamp
 from models.enrollment import Enrollment

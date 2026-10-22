@@ -37,9 +37,8 @@ class _TemplateResponseCompat:
             context = args[1] if len(args) > 1 else kwargs.get("context", {})
             if context is None:
                 context = {}
-            request = context.get("request")
             return self._templates.TemplateResponse(
-                request, name, context,
+                name=name, context=context,
                 status_code=kwargs.get("status_code", 200),
                 headers=kwargs.get("headers"),
                 media_type=kwargs.get("media_type"),

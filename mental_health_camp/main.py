@@ -45,9 +45,9 @@ async def security_headers_middleware(request: Request, call_next):
         "frame-ancestors 'none';"
     )
     # 确保每个响应都设置CSRF cookie
-    from utils.csrf import CSRF_COOKIE_NAME, generate_csrf_token
+    from utils.csrf import CSRF_COOKIE_NAME, get_or_create_csrf_token
     if CSRF_COOKIE_NAME not in request.cookies:
-        token = generate_csrf_token()
+        token = get_or_create_csrf_token(request)
         response.set_cookie(
             CSRF_COOKIE_NAME, token,
             httponly=False,
@@ -60,6 +60,8 @@ async def security_headers_middleware(request: Request, call_next):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if 300 <= exc.status_code < 400 and exc.headers and exc.headers.get("Location"):
+        return RedirectResponse(exc.headers["Location"], status_code=exc.status_code, headers=exc.headers)
     if exc.status_code == 404:
         return templates.TemplateResponse("index.html", {
             "request": request,
@@ -67,7 +69,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             "app_description": APP_DESCRIPTION,
             "error": "页面不存在",
         }, status_code=404)
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
 
 
 @app.exception_handler(Exception)

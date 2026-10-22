@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 from database import get_db
 from models.user import User
 from config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-from utils.csrf import validate_csrf_token
+from utils.csrf import CSRF_HEADER_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,7 @@ async def verify_csrf(request: Request, csrf_token: str = Form("")) -> None:
     if not cookie_token:
         logger.warning("CSRF验证失败：cookie中无token [path=%s]", request.url.path)
         raise HTTPException(status_code=403, detail="CSRF token缺失")
-    if not _secrets.compare_digest(cookie_token, csrf_token):
+    submitted_token = csrf_token or request.headers.get(CSRF_HEADER_NAME, "")
+    if not _secrets.compare_digest(cookie_token, submitted_token):
         logger.warning("CSRF验证失败：token不匹配 [path=%s]", request.url.path)
         raise HTTPException(status_code=403, detail="CSRF token无效")
