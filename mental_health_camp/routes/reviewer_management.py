@@ -8,10 +8,12 @@ from database import get_db
 from models.user import User
 from models.submission import Submission
 from models.review_assignment import ReviewAssignment
-from auth import require_super_admin, get_password_hash, verify_csrf
+from auth import require_admin, require_super_admin, get_password_hash, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from routes.audit import log_admin_action
+from services import reviews
+from services.versions import write_lock
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +95,9 @@ async def create_reviewer(request: Request, admin: User = Depends(require_super_
         try:
             max_concurrent_tasks = int(max_concurrent_tasks_str)
         except (TypeError, ValueError):
-            max_concurrent_tasks = 10
+            raise HTTPException(400, "任务容量必须为整数")
+        if max_concurrent_tasks < 1:
+            raise HTTPException(400, "任务容量必须大于零")
         
         existing = db.query(User).filter(User.email == email).first()
         if existing:
@@ -183,7 +187,7 @@ async def edit_reviewer_page(request: Request, reviewer_id: int, admin: User = D
 
 
 @router.post("/super-admin/reviewer/{reviewer_id}/edit")
-async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
+async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depends(require_super_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """更新审核员信息"""
     try:
         reviewer = db.query(User).filter(User.id == reviewer_id, User.role == "reviewer").first()
@@ -202,7 +206,9 @@ async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depe
         try:
             max_concurrent_tasks = int(max_concurrent_tasks_str)
         except (TypeError, ValueError):
-            max_concurrent_tasks = reviewer.max_concurrent_tasks
+            raise HTTPException(400, "任务容量必须为整数")
+        if max_concurrent_tasks < 1:
+            raise HTTPException(400, "任务容量必须大于零")
         
         reviewer.nickname = nickname
         reviewer.specialty = specialty or None
@@ -225,14 +231,18 @@ async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depe
 
 
 @router.post("/super-admin/reviewer/{reviewer_id}/toggle")
-async def toggle_reviewer(request: Request, reviewer_id: int, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
+async def toggle_reviewer(request: Request, reviewer_id: int, admin: User = Depends(require_super_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     """启用/禁用审核员"""
     try:
         reviewer = db.query(User).filter(User.id == reviewer_id, User.role == "reviewer").first()
         if not reviewer:
             raise HTTPException(status_code=404, detail="审核员不存在")
         
+        write_lock(db)
+        db.refresh(reviewer)
         reviewer.is_active = not reviewer.is_active
+        if not reviewer.is_active:
+            reviews.release_reviewer(db, reviewer.id)
         db.commit()
         
         action = "启用审核员" if reviewer.is_active else "禁用审核员"
@@ -246,189 +256,25 @@ async def toggle_reviewer(request: Request, reviewer_id: int, admin: User = Depe
 
 
 @router.get("/super-admin/assignments")
-async def assignment_list(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
-    """审核任务分配管理页面"""
-    try:
-        # 获取所有待审核的提交
-        pending_submissions = db.query(Submission).filter(
-            Submission.review_status == "pending"
-        ).order_by(Submission.submitted_at.desc()).all()
-        
-        # 获取所有活跃的审核员
-        active_reviewers = db.query(User).filter(
-            User.role == "reviewer",
-            User.is_active == True
-        ).all()
-        
-        # 获取每个审核员的当前任务数
-        reviewer_workload = {}
-        for reviewer in active_reviewers:
-            pending_count = db.query(ReviewAssignment).filter(
-                ReviewAssignment.reviewer_id == reviewer.id,
-                ReviewAssignment.status == "pending"
-            ).count()
-            reviewer_workload[reviewer.id] = {
-                "pending_count": pending_count,
-                "max_tasks": reviewer.max_concurrent_tasks,
-                "specialty": reviewer.specialty,
-            }
-        
-        # 获取已分配的任务
-        assignments = db.query(ReviewAssignment).filter(
-            ReviewAssignment.status == "pending"
-        ).all()
-        assigned_submission_ids = {a.submission_id for a in assignments}
-        
-        return templates.TemplateResponse("super_admin/assignments.html", {
-            "request": request, "user": admin, "app_name": APP_NAME,
-            "pending_submissions": pending_submissions,
-            "active_reviewers": active_reviewers,
-            "reviewer_workload": reviewer_workload,
-            "assigned_submission_ids": assigned_submission_ids,
-        })
-    except Exception as e:
-        logger.exception("加载审核任务分配页面失败: %s", e)
-        raise HTTPException(status_code=500, detail="加载页面时发生错误")
+async def assignment_list(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    return RedirectResponse("/admin/assignments?view=all",303)
 
 
 @router.post("/super-admin/assign")
-async def assign_review_task(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db)):
-    """手动分配审核任务"""
+async def assign_review_task(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
+    form = await request.form()
     try:
-        form_data = await request.form()
-        submission_id_str = form_data.get("submission_id", "")
-        reviewer_id_str = form_data.get("reviewer_id", "")
-        
-        if not submission_id_str or not reviewer_id_str:
-            raise HTTPException(status_code=400, detail="请选择提交和审核员")
-        
-        try:
-            submission_id = int(submission_id_str)
-            reviewer_id = int(reviewer_id_str)
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="ID必须为数字")
-        
-        # 检查提交是否存在且待审核
-        submission = db.query(Submission).filter(
-            Submission.id == submission_id,
-            Submission.review_status == "pending"
-        ).first()
-        if not submission:
-            raise HTTPException(status_code=404, detail="提交不存在或已审核")
-        
-        # 检查审核员是否存在且活跃
-        reviewer = db.query(User).filter(
-            User.id == reviewer_id,
-            User.role == "reviewer",
-            User.is_active == True
-        ).first()
-        if not reviewer:
-            raise HTTPException(status_code=404, detail="审核员不存在或已禁用")
-        
-        # 检查是否已分配
-        existing_assignment = db.query(ReviewAssignment).filter(
-            ReviewAssignment.submission_id == submission_id,
-            ReviewAssignment.status == "pending"
-        ).first()
-        if existing_assignment:
-            # 更新分配
-            existing_assignment.reviewer_id = reviewer_id
-            existing_assignment.assigned_by = admin.id
-            existing_assignment.assignment_type = "manual"
-        else:
-            # 创建新分配
-            assignment = ReviewAssignment(
-                submission_id=submission_id,
-                reviewer_id=reviewer_id,
-                assigned_by=admin.id,
-                assignment_type="manual",
-                status="pending",
-            )
-            db.add(assignment)
-        
-        # 同时更新提交的审核员
-        submission.reviewer_id = reviewer_id
-        db.commit()
-        
-        log_admin_action(db, admin.id, "手动分配审核任务", "submission", submission_id, {
-            "reviewer_id": reviewer_id
-        })
-        return RedirectResponse("/super-admin/assignments", status_code=302)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("分配审核任务失败: %s", e)
-        raise HTTPException(status_code=500, detail="分配任务时发生错误")
+        submission_id, reviewer_id = int(form['submission_id']), int(form['reviewer_id'])
+    except (KeyError,ValueError):
+        raise HTTPException(400, "请选择提交和审核员")
+    reviews.assign(db, submission_id, reviewer_id, admin, form.get('attempt_id',''))
+    db.commit()
+    return RedirectResponse('/admin/assignments?view=all',303)
 
 
 @router.post("/super-admin/auto-assign")
 async def auto_assign_tasks(request: Request, admin: User = Depends(require_super_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
-    """智能自动分配审核任务"""
-    try:
-        # 获取所有待审核且未分配的提交
-        pending_submissions = db.query(Submission).filter(
-            Submission.review_status == "pending",
-            Submission.reviewer_id.is_(None)
-        ).all()
-        
-        # 获取所有活跃的审核员
-        active_reviewers = db.query(User).filter(
-            User.role == "reviewer",
-            User.is_active == True
-        ).all()
-        
-        if not active_reviewers:
-            raise HTTPException(status_code=400, detail="没有可用的审核员")
-        
-        assigned_count = 0
-        
-        for submission in pending_submissions:
-            # 找到负载最低的审核员
-            best_reviewer = None
-            min_workload = float('inf')
-            
-            for reviewer in active_reviewers:
-                # 检查当前任务数
-                current_tasks = db.query(ReviewAssignment).filter(
-                    ReviewAssignment.reviewer_id == reviewer.id,
-                    ReviewAssignment.status == "pending"
-                ).count()
-                
-                # 检查是否超过最大任务数
-                if current_tasks >= reviewer.max_concurrent_tasks:
-                    continue
-                
-                # 简单的负载均衡：选择任务最少的审核员
-                if current_tasks < min_workload:
-                    min_workload = current_tasks
-                    best_reviewer = reviewer
-            
-            if best_reviewer:
-                # 创建分配
-                assignment = ReviewAssignment(
-                    submission_id=submission.id,
-                    reviewer_id=best_reviewer.id,
-                    assigned_by=admin.id,
-                    assignment_type="auto",
-                    status="pending",
-                )
-                db.add(assignment)
-                
-                # 更新提交的审核员
-                submission.reviewer_id = best_reviewer.id
-                assigned_count += 1
-        
-        db.commit()
-        
-        log_admin_action(db, admin.id, "智能分配审核任务", "assignment", None, {
-            "assigned_count": assigned_count
-        })
-        return RedirectResponse("/super-admin/assignments", status_code=302)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("智能分配任务失败: %s", e)
-        raise HTTPException(status_code=500, detail="智能分配时发生错误")
+    raise HTTPException(409, "请使用审核员公共队列领取，或管理员手动分配")
 
 
 @router.get("/super-admin/review-stats")
