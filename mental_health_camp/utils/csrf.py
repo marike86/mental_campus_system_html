@@ -23,7 +23,10 @@ def get_or_create_csrf_token(request: Request) -> str:
     """获取现有CSRF token或生成新的"""
     token = get_csrf_token_from_cookie(request)
     if not token:
-        token = generate_csrf_token()
+        token = getattr(request.state, "csrf_token", None)
+        if not token:
+            token = generate_csrf_token()
+            request.state.csrf_token = token
     return token
 
 

@@ -4,6 +4,7 @@ class CampStepManager {
         this.enrollmentId = options.enrollmentId;
         this.dayNumber = options.dayNumber;
         this.formAction = options.formAction;
+        this.csrfToken = options.csrfToken;
         this.currentStep = 0;
         this.steps = this._buildSteps();
         this.answers = {};
@@ -194,6 +195,7 @@ class CampStepManager {
         html += '<h2 class="text-xl font-bold text-gray-900 mb-2">所有步骤已完成！</h2>';
         html += '<p class="text-gray-500 mb-6">点击下方按钮提交你的回答</p>';
         html += '<form id="camp-submit-form" method="POST" action="' + this.formAction + '">';
+        html += '<input type="hidden" name="csrf_token" value="' + this._esc(this.csrfToken) + '">';
         for (var key in this.answers) {
             var val = this.answers[key];
             if (Array.isArray(val)) {
@@ -258,7 +260,7 @@ class CampStepManager {
             try {
                 var resp = await fetch('/user/api/verify-answer', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrfToken },
                     body: JSON.stringify({
                         enrollment_id: this.enrollmentId,
                         day_number: this.dayNumber,

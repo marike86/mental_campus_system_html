@@ -373,11 +373,14 @@ async def example():
 # 进入项目目录
 cd mental_health_camp
 
-# 运行所有测试
-python tests.py
+# 安装测试依赖
+python -m pip install -r requirements-dev.txt
 
 # 使用 pytest 运行（推荐）
-pytest tests.py -v
+python -m pytest tests.py test_regressions.py -v
+
+# 验证课程前端的令牌传递（需要 Node.js）
+node --test test_camp_content.js
 
 # 运行特定测试类
 pytest tests.py::TestLoginRoutes -v
