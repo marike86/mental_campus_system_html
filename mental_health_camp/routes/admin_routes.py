@@ -70,8 +70,9 @@ async def create_bootcamp(request: Request, admin: User = Depends(require_admin)
     for i in range(1, days + 1):
         day_form = DayForm(bootcamp_id=bootcamp.id, day_number=i, questions=[])
         db.add(day_form)
-    db.commit()
+    db.flush()
     log_admin_action(db, admin.id, "创建训练营", "bootcamp", bootcamp.id, {"name": name})
+    db.commit()
     return RedirectResponse(f"/admin/bootcamp/{bootcamp.id}", status_code=302)
 
 
@@ -113,8 +114,9 @@ async def update_bootcamp(request: Request, bootcamp_id: int, admin: User = Depe
         bootcamp.days = days
     bootcamp.name = new_name
     bootcamp.description = form_data.get("description", bootcamp.description).strip()
-    db.commit()
+    db.flush()
     log_admin_action(db, admin.id, "更新训练营", "bootcamp", bootcamp.id, {"name": bootcamp.name})
+    db.commit()
     return RedirectResponse(f"/admin/bootcamp/{bootcamp_id}", status_code=302)
 
 
@@ -147,6 +149,7 @@ async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: Use
     if not isinstance(questions, list) or any(not isinstance(q,dict) for q in questions):
         raise HTTPException(400, "题目必须为列表")
     day_form.questions = questions
+    log_admin_action(db, admin.id, "保存表单草稿", "day_form", day_form.id)
     db.commit()
     return RedirectResponse(f"/admin/bootcamp/{bootcamp_id}", status_code=302)
 
@@ -163,9 +166,10 @@ async def toggle_bootcamp(bootcamp_id: int, admin: User = Depends(require_admin)
     db.flush()
     from services.metrics import capture
     capture(db)
-    db.commit()
+    db.flush()
     action = "发布训练营" if bootcamp.is_active else "下线训练营"
     log_admin_action(db, admin.id, action, "bootcamp", bootcamp.id)
+    db.commit()
     return RedirectResponse("/admin/bootcamps", status_code=302)
 
 
@@ -215,8 +219,9 @@ async def enroll_user(request: Request, admin: User = Depends(require_admin), db
         db.flush()
         from services.metrics import capture
         capture(db)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "分配训练营", "enrollment", enrollment.id, {"user_id": user_id, "bootcamp_id": bootcamp_id})
+        db.commit()
     return RedirectResponse("/admin/users", status_code=302)
 
 
@@ -286,6 +291,7 @@ async def export_csv(request: Request, admin: User = Depends(require_admin), db:
         filename = f"{safe_name}_export.csv"
         encoded_filename = urllib.parse.quote(filename)
         log_admin_action(db, admin.id, "导出数据", "bootcamp", bootcamp_id, {"batch_id": batch_id, "enrollment_count": len(enrollments)})
+        db.commit()
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8-sig")),
             media_type="text/csv",
@@ -336,6 +342,7 @@ async def admin_dashboard(request: Request, admin: User = Depends(require_admin)
     bootcamp_stats.sort(key=lambda x: x["completion_rate"], reverse=True)
     likert_stats = _collect_likert_stats(db)
     log_admin_action(db, admin.id, "查看数据看板", "dashboard")
+    db.commit()
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request, "user": admin, "app_name": APP_NAME,
         "total_users": total_users, "active_users": active_users,
@@ -419,8 +426,9 @@ async def create_batch(request: Request, admin: User = Depends(require_admin), d
         end_date=end_date,
     )
     db.add(batch)
-    db.commit()
+    db.flush()
     log_admin_action(db, admin.id, "创建批次", "batch", batch.id, {"name": name, "bootcamp_id": bootcamp_id})
+    db.commit()
     return RedirectResponse("/admin/batches", status_code=302)
 
 
@@ -435,6 +443,7 @@ async def view_user_data(request: Request, admin: User = Depends(require_admin),
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="用户ID必须为数字")
     log_admin_action(db, admin.id, "查看用户数据", "user", user_id)
+    db.commit()
     return RedirectResponse(f"/admin/users", status_code=302)
 
 
@@ -491,11 +500,12 @@ async def batch_enroll_users(request: Request, admin: User = Depends(require_adm
         db.flush()
         from services.metrics import capture
         capture(db)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "批量分配训练营", "bootcamp", bootcamp_id, {
             "user_ids": user_id_list, "batch_id": batch_id,
             "enrolled": enrolled_count, "skipped": skipped_count,
         })
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -522,11 +532,14 @@ async def admin_reset_password(request: Request, admin: User = Depends(require_a
         if not pwd_valid:
             raise HTTPException(status_code=400, detail=pwd_error)
         user = db.query(User).filter(User.id == user_id).first()
+        if user and user.role == "reviewer" and admin.role != "super_admin":
+            raise HTTPException(403, "审核员账号仅限超级管理员管理")
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         user.hashed_password = get_password_hash(new_password)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "重置用户密码", "user", user_id)
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -550,6 +563,8 @@ async def admin_delete_user(request: Request, admin: User = Depends(require_admi
         if confirm != "yes":
             raise HTTPException(status_code=400, detail="请确认删除操作")
         user = db.query(User).filter(User.id == user_id).first()
+        if user and user.role == "reviewer" and admin.role != "super_admin":
+            raise HTTPException(403, "审核员账号仅限超级管理员管理")
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         if user.role in ("admin","super_admin"):
@@ -559,8 +574,9 @@ async def admin_delete_user(request: Request, admin: User = Depends(require_admi
         from services.cleanup import delete_user_data
         delete_user_data(db, user_id)
         db.delete(user)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "删除用户", "user", user_id, {"nickname": user_nickname, "email": user_email})
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -600,7 +616,7 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
         if admin.role == "super_admin":
             allowed_roles = ("user", "admin", "reviewer")
         else:
-            allowed_roles = ("user", "reviewer")
+            allowed_roles = ("user",)
         if role not in allowed_roles:
             raise HTTPException(status_code=403, detail="无权创建该角色的用户")
         existing = db.query(User).filter(User.email == email).first()
@@ -616,8 +632,9 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
             grade=grade or None,
         )
         db.add(user)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "创建用户", "user", user.id, {"email": email, "nickname": nickname, "role": role})
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -629,16 +646,21 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
 @router.post("/admin/enrollment/{enrollment_id}/approve")
 async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
-        enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+        from services.versions import write_lock
+        write_lock(db)
+        enrollment = db.query(Enrollment).populate_existing().filter(Enrollment.id == enrollment_id).first()
         if not enrollment:
             raise HTTPException(status_code=404, detail="申请不存在")
+        from services.bulk import validate
+        validate(db, "approve", [enrollment_id], None)
         enrollment.status = "approved"
         enrollment.start_date = enrollment.start_date or enrollment_start(db, enrollment.bootcamp_id, enrollment.batch_id)
         db.flush()
         from services.metrics import capture
         capture(db)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "审批通过加入申请", "enrollment", enrollment_id)
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -650,12 +672,15 @@ async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_a
 @router.post("/admin/enrollment/{enrollment_id}/reject")
 async def reject_enrollment(enrollment_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     try:
-        enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id).first()
+        from services.versions import write_lock
+        write_lock(db)
+        enrollment = db.query(Enrollment).populate_existing().filter(Enrollment.id == enrollment_id).first()
         if not enrollment:
             raise HTTPException(status_code=404, detail="申请不存在")
         enrollment.status = "rejected"
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "拒绝加入申请", "enrollment", enrollment_id)
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -676,6 +701,8 @@ async def admin_edit_user(request: Request, admin: User = Depends(require_admin)
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="用户ID必须为数字")
         user = db.query(User).filter(User.id == user_id).first()
+        if user and user.role == "reviewer" and admin.role != "super_admin":
+            raise HTTPException(403, "审核员账号仅限超级管理员管理")
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         nickname = form_data.get("nickname", "").strip()
@@ -689,8 +716,9 @@ async def admin_edit_user(request: Request, admin: User = Depends(require_admin)
         user.student_id = student_id or None
         user.college = college or None
         user.grade = grade or None
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "编辑用户信息", "user", user_id, {"nickname": nickname})
+        db.commit()
         return RedirectResponse("/admin/users", status_code=302)
     except HTTPException:
         raise
@@ -736,8 +764,9 @@ async def admin_edit_batch(request: Request, admin: User = Depends(require_admin
             batch.end_date = None
         is_active_str = form_data.get("is_active", "")
         batch.is_active = is_active_str in ("on", "true", "1")
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "编辑批次", "batch", batch_id, {"name": name})
+        db.commit()
         return RedirectResponse("/admin/batches", status_code=302)
     except HTTPException:
         raise
@@ -767,10 +796,11 @@ async def admin_delete_batch(request: Request, admin: User = Depends(require_adm
             )
         batch_name = batch.name
         db.delete(batch)
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "删除批次", "batch", batch_id, {
             "name": batch_name, "reassigned_enrollments": enrollment_count,
         })
+        db.commit()
         return RedirectResponse("/admin/batches", status_code=302)
     except HTTPException:
         raise
@@ -810,10 +840,11 @@ async def admin_batch_delete_batches(request: Request, admin: User = Depends(req
                 reassigned_total += enrollment_count
             db.delete(batch)
             deleted_count += 1
-        db.commit()
+        db.flush()
         log_admin_action(db, admin.id, "批量删除批次", "batch", None, {
             "batch_ids": batch_id_list, "deleted": deleted_count, "reassigned_enrollments": reassigned_total,
         })
+        db.commit()
         return RedirectResponse("/admin/batches", status_code=302)
     except HTTPException:
         raise

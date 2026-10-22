@@ -35,6 +35,9 @@ with SessionLocal() as db:
         form=DayForm(bootcamp_id=camp.id,day_number=day,questions=questions)
         db.add(form);db.flush();publish(db,form,people[0].id)
     db.add(Enrollment(user_id=people[2].id,bootcamp_id=camp.id,start_date=local_date()-timedelta(days=1),status='approved'))
+    pending=User(email='pending@example.com',nickname='待批准学员',role='user',hashed_password=hashed,is_active=True)
+    db.add(pending);db.flush()
+    db.add(Enrollment(user_id=pending.id,bootcamp_id=camp.id,status='pending'))
     db.commit()
 '''
 

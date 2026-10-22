@@ -37,7 +37,7 @@ def authorize_detail(db, sub, attempt, actor):
     raise HTTPException(403, "请先领取此任务；仅可访问自己的审核记录")
 
 
-def assign(db, submission_id, reviewer_id, actor, attempt_id=None):
+def assign(db, submission_id, reviewer_id, actor, attempt_id=None, operation_id=None):
     write_lock(db)
     sub, attempt = current_attempt(db, submission_id, attempt_id)
     if attempt.review_status != 'pending':
@@ -65,6 +65,8 @@ def assign(db, submission_id, reviewer_id, actor, attempt_id=None):
     db.add(assignment)
     sub.reviewer_id = reviewer.id
     db.flush()
+    from services.audit import record
+    record(db, actor.id, "分配审核任务", "submission", sub.id, {"attempt_id":attempt.id,"reviewer_id":reviewer.id,"assignment_id":assignment.id}, event_type="review.transfer" if existing else "review.assign" if is_admin else "review.claim", operation_id=operation_id)
     return assignment
 
 
@@ -95,12 +97,17 @@ def decide(db, submission_id, attempt_id, actor, result, comment=''):
     capture(db)
     from services.inbox import review_result
     review_result(db, sub, attempt, result, comment.strip())
+    from services.audit import record
+    record(db, actor.id, "审核决定", "submission", sub.id, {"attempt_id":attempt.id,"after":result}, event_type="review.decide")
     return sub, attempt
 
 
-def release_reviewer(db, reviewer_id):
+def release_reviewer(db, reviewer_id, actor_id=None):
     for assignment in db.query(ReviewAssignment).filter_by(reviewer_id=reviewer_id, status='pending'):
         assignment.status, assignment.completed_at = 'released', now()
+        if actor_id:
+            from services.audit import record
+            record(db,actor_id,'释放审核任务','submission',assignment.submission_id,{'assignment_id':assignment.id,'reviewer_id':reviewer_id},event_type='review.release')
         sub = db.get(Submission, assignment.submission_id)
         if sub and sub.current_attempt_id==assignment.attempt_id and sub.review_status=='pending':
             sub.reviewer_id = None

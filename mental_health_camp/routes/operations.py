@@ -57,4 +57,32 @@ async def export(camp: str='',batch: str='',start: date=None,end: date=None,admi
     writer.writerow(['日期','有可做任务人数','提交人数','参与率','采集状态'])
     for day in data['daily']:
         writer.writerow([day['date'],day['eligible'],day['submitted'],day['rate'],day['coverage']])
+    from services.audit import record
+    record(db,admin.id,'生成运营统计导出','export',event_type='export.operations.generated',camp_id=int(camp) if camp else None,batch_id=int(batch) if batch else None)
+    db.commit()
     return StreamingResponse(iter([output.getvalue().encode('utf-8-sig')]),media_type='text/csv',headers={'Content-Disposition':'attachment; filename=operations.csv'})
+
+@router.get('/admin/operations/followup/export')
+async def followup_export(camp:str='',batch:str='',admin=Depends(require_admin),db:Session=Depends(get_db)):
+    from models.enrollment import Enrollment
+    from models.submission import Submission
+    from services.courses import states
+    from services.audit import record
+    from services.clock import local_date
+    data=filtered(db,camp,batch,None,None)
+    ids=[x['enrollment_id'] for x in data['followup']]
+    enrollments={e.id:e for e in db.query(Enrollment).filter(Enrollment.id.in_(ids))}
+    camps={c.id:c.name for c in db.query(Bootcamp)}
+    batches={b.id:b.name for b in db.query(Batch)}
+    subs={(s.enrollment_id,s.day_number):s.review_status for s in db.query(Submission).filter(Submission.enrollment_id.in_(ids))}
+    def safe(value):
+        value=str(value if value is not None else '')
+        return "'"+value if value.lstrip().startswith(('=','+','-','@')) else value
+    output=io.StringIO();writer=csv.writer(output)
+    writer.writerow(['学员ID','昵称','报名ID','训练营','批次','最后提交时间UTC','下一任务','当前状态'])
+    for item in data['followup']:
+        e=enrollments[item['enrollment_id']]
+        writer.writerow([safe(v) for v in [e.user_id,item['nickname'],e.id,camps[e.bootcamp_id],batches.get(e.batch_id,'未分批'),item['last_submitted_at'],item['next_day'],'需修改' if subs.get((e.id,item['next_day']))=='rejected' else '可学习']])
+    record(db,admin.id,'生成当前待跟进名单','export',detail={'count':len(ids)},event_type='export.followup.generated',camp_id=int(camp) if camp else None,batch_id=int(batch) if batch else None)
+    db.commit()
+    return StreamingResponse(iter([output.getvalue().encode('utf-8-sig')]),media_type='text/csv',headers={'Content-Disposition':'attachment; filename=current-followup.csv'})
