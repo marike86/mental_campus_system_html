@@ -16,4 +16,5 @@ class Enrollment(Base):
 
     __table_args__ = (
         Index('idx_enrollment_user_bootcamp', 'user_id', 'bootcamp_id'),
+        Index('uq_enrollment_camp', 'user_id', 'bootcamp_id', unique=True),
     )

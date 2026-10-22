@@ -25,6 +25,8 @@
 
 ---
 
+详细的课程版本、审核领取、通知、运营及升级说明见 [WORKFLOWS.md](mental_health_camp/WORKFLOWS.md)。
+
 ## 功能特性
 
 ### 用户端功能
@@ -128,6 +130,9 @@ export ADMIN_PASSWORD="your-strong-password"
 ### 5. 启动应用
 
 ```bash
+# 首次安装与升级均先执行显式迁移
+python migrate.py
+
 # 开发模式（自动重载）
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
@@ -377,10 +382,10 @@ cd mental_health_camp
 python -m pip install -r requirements-dev.txt
 
 # 使用 pytest 运行（推荐）
-python -m pytest tests.py test_regressions.py -v
+python -m pytest tests.py test_regressions.py test_workflows.py test_migrations.py -v
 
 # 验证课程前端的令牌传递（需要 Node.js）
-node --test test_camp_content.js
+node --test test_camp_content.js test_draft.js
 
 # 运行特定测试类
 pytest tests.py::TestLoginRoutes -v

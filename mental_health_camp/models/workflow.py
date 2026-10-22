@@ -1,5 +1,5 @@
 """Versioned learning, immutable submission rounds and inbox records."""
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON, Boolean, UniqueConstraint, Index, text
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Date, JSON, Boolean, UniqueConstraint, Index, text
 from database import Base
 
 
@@ -59,3 +59,21 @@ class Notification(Base):
     created_at = Column(DateTime, nullable=False)
     read_at = Column(DateTime)
     dedupe_key = Column(String, unique=True, nullable=False)
+
+
+class ParticipationDay(Base):
+    __tablename__ = "participation_days"
+    id = Column(Integer, primary_key=True)
+    enrollment_id = Column(Integer, ForeignKey("enrollments.id"), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    eligible = Column(Boolean, nullable=False, default=False)
+    submitted = Column(Boolean, nullable=False, default=False)
+    __table_args__ = (UniqueConstraint('enrollment_id', 'date'),)
+
+
+class MetricsCoverage(Base):
+    __tablename__ = "metrics_coverage"
+    date = Column(Date, primary_key=True)
+    first_scan = Column(DateTime, nullable=False)
+    last_scan = Column(DateTime, nullable=False)
+    has_gap = Column(Boolean, nullable=False, default=False)

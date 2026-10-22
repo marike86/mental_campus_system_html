@@ -11,6 +11,8 @@ from services.inbox import overdue_scan
 def scan():
     with SessionLocal() as db:
         count = overdue_scan(db)
+        from services.metrics import capture
+        capture(db, heartbeat=True)
         db.commit()
         return count
 

@@ -160,7 +160,7 @@
                             {% for review in recent_reviews %}
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <a href="/review/{{ review.id }}" class="text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
+                                    <a href="/review/{{ review.submission_id }}?attempt_id={{review.id}}" class="text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {% if review.review_status == 'approved' %}
@@ -189,7 +189,7 @@
                 {% for review in recent_reviews %}
                 <div class="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div class="flex items-center justify-between">
-                        <a href="/review/{{ review.id }}" class="text-sm font-medium text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
+                        <a href="/review/{{ review.submission_id }}?attempt_id={{review.id}}" class="text-sm font-medium text-brand-600 hover:text-brand-900">#{{ review.id }}</a>
                         {% if review.review_status == 'approved' %}
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">通过</span>
                         {% elif review.review_status == 'rejected' %}

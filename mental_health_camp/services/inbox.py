@@ -45,6 +45,10 @@ def present(db, notification, actor):
         next_url = None
     else:
         url = f'/user/form/{sub.enrollment_id}/{sub.day_number}'
-        action = '修改后重提' if current and sub.review_status=='rejected' else '查看当前记录'
+        from services.courses import progress
+        enrolled=db.get(Enrollment,sub.enrollment_id)
+        _,items=progress(db,enrolled)
+        editable=any(x['day']==sub.day_number and x['actionable'] for x in items)
+        action = '修改后重提' if current and sub.review_status=='rejected' and editable else '查看当前记录'
         next_url = f'/user/course/{sub.enrollment_id}' if notification.event=='approved' else None
     return dict(notification=notification, url=url, action=action, next_url=next_url)

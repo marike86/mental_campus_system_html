@@ -144,7 +144,7 @@ async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: Use
         questions = json.loads(questions_str)
     except json.JSONDecodeError:
         raise HTTPException(400, "题目 JSON 格式错误")
-    if not isinstance(questions, list):
+    if not isinstance(questions, list) or any(not isinstance(q,dict) for q in questions):
         raise HTTPException(400, "题目必须为列表")
     day_form.questions = questions
     db.commit()
@@ -156,7 +156,13 @@ async def toggle_bootcamp(bootcamp_id: int, admin: User = Depends(require_admin)
     bootcamp = db.query(Bootcamp).filter(Bootcamp.id == bootcamp_id).first()
     if not bootcamp:
         raise HTTPException(status_code=404, detail="训练营不存在")
+    write_lock(db)
+    from services.metrics import capture
+    capture(db)
     bootcamp.is_active = not bootcamp.is_active
+    db.flush()
+    from services.metrics import capture
+    capture(db)
     db.commit()
     action = "发布训练营" if bootcamp.is_active else "下线训练营"
     log_admin_action(db, admin.id, action, "bootcamp", bootcamp.id)
@@ -206,6 +212,9 @@ async def enroll_user(request: Request, admin: User = Depends(require_admin), db
             batch_id=int(batch_id) if batch_id and batch_id.isdigit() else None
         )
         db.add(enrollment)
+        db.flush()
+        from services.metrics import capture
+        capture(db)
         db.commit()
         log_admin_action(db, admin.id, "分配训练营", "enrollment", enrollment.id, {"user_id": user_id, "bootcamp_id": bootcamp_id})
     return RedirectResponse("/admin/users", status_code=302)
@@ -318,7 +327,7 @@ async def admin_dashboard(request: Request, admin: User = Depends(require_admin)
             enrollment_ids = [e.id for e in enrollments]
             submission_counts = dict(
                 db.query(Submission.enrollment_id, sql_func.count(Submission.id))
-                .filter(Submission.enrollment_id.in_(enrollment_ids))
+                .filter(Submission.enrollment_id.in_(enrollment_ids), Submission.review_status=="approved")
                 .group_by(Submission.enrollment_id).all()
             )
             completed_count = sum(1 for count in submission_counts.values() if count >= b.days)
@@ -336,45 +345,19 @@ async def admin_dashboard(request: Request, admin: User = Depends(require_admin)
 
 
 def _collect_likert_stats(db: Session):
-    all_day_forms = db.query(DayForm).all()
-    likert_questions = {}
-    for df in all_day_forms:
-        for q in (df.questions or []):
-            if q.get("type") == "likert":
-                key = f"{df.bootcamp_id}_{q['id']}"
-                if key not in likert_questions:
-                    likert_questions[key] = {
-                        "qid": q["id"], "label": q["label"],
-                        "labels": q.get("labels", []),
-                        "min": q.get("min", 1), "max": q.get("max", 5),
-                        "bootcamp_id": df.bootcamp_id, "day_number": df.day_number
-                    }
-    results = []
-    if not likert_questions:
-        return results
-    
-    all_submissions = db.query(Submission).all()
-    
-    for key, qinfo in list(likert_questions.items())[:5]:
-        counts = {}
-        for i in range(qinfo["min"], qinfo["max"] + 1):
-            counts[i] = 0
-        for s in all_submissions:
-            answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
-            val = answers.get(qinfo["qid"], None)
-            if isinstance(val, int) and val in counts:
-                counts[val] += 1
-        total_answers = sum(counts.values())
-        if total_answers == 0:
-            continue
-        options = []
-        for i in range(qinfo["min"], qinfo["max"] + 1):
-            label = qinfo["labels"][i - qinfo["min"]] if qinfo["labels"] and i - qinfo["min"] < len(qinfo["labels"]) else str(i)
-            count = counts[i]
-            pct = int((count / total_answers * 100)) if total_answers > 0 else 0
-            options.append({"label": label, "count": count, "pct": pct})
-        results.append({"question_label": qinfo["label"], "options": options})
-    return results
+    from services.versions import submission_questions
+    from models.workflow import SubmissionAttempt
+    grouped = {}
+    for sub in db.query(Submission).filter_by(review_status='approved'):
+        answers=decrypt_data(sub.answers)
+        attempt=db.get(SubmissionAttempt,sub.current_attempt_id) if sub.current_attempt_id else None
+        for q in submission_questions(db,sub):
+            value=answers.get(q['id'])
+            if q['type']=='likert' and isinstance(value,int):
+                key=f"{attempt.version_id if attempt else 'legacy'}:{q['id']}"
+                row=grouped.setdefault(key,dict(label=q.get('label',''),values=[]))
+                row['values'].append(value)
+    return [dict(label=f"{key} · {row['label']}",average=round(sum(row['values'])/len(row['values']),2),question_label=f"{key} · {row['label']}",options=[dict(label=str(v),count=row['values'].count(v),pct=round(row['values'].count(v)/len(row['values'])*100,1)) for v in sorted(set(row['values']))]) for key,row in grouped.items()]
 
 
 @router.get("/admin/batches")
@@ -505,6 +488,9 @@ async def batch_enroll_users(request: Request, admin: User = Depends(require_adm
             )
             db.add(enrollment)
             enrolled_count += 1
+        db.flush()
+        from services.metrics import capture
+        capture(db)
         db.commit()
         log_admin_action(db, admin.id, "批量分配训练营", "bootcamp", bootcamp_id, {
             "user_ids": user_id_list, "batch_id": batch_id,
@@ -566,16 +552,12 @@ async def admin_delete_user(request: Request, admin: User = Depends(require_admi
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        if user.role == "admin":
+        if user.role in ("admin","super_admin"):
             raise HTTPException(status_code=400, detail="不能删除管理员账号")
         user_nickname = user.nickname
         user_email = user.email
-        enrollments = db.query(Enrollment).filter(Enrollment.user_id == user_id).all()
-        enrollment_ids = [e.id for e in enrollments]
-        if enrollment_ids:
-            db.query(Submission).filter(Submission.enrollment_id.in_(enrollment_ids)).delete(synchronize_session=False)
-            db.query(Enrollment).filter(Enrollment.user_id == user_id).delete(synchronize_session=False)
-        db.query(UserBadge).filter(UserBadge.user_id == user_id).delete(synchronize_session=False)
+        from services.cleanup import delete_user_data
+        delete_user_data(db, user_id)
         db.delete(user)
         db.commit()
         log_admin_action(db, admin.id, "删除用户", "user", user_id, {"nickname": user_nickname, "email": user_email})
@@ -652,6 +634,9 @@ async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_a
             raise HTTPException(status_code=404, detail="申请不存在")
         enrollment.status = "approved"
         enrollment.start_date = enrollment.start_date or enrollment_start(db, enrollment.bootcamp_id, enrollment.batch_id)
+        db.flush()
+        from services.metrics import capture
+        capture(db)
         db.commit()
         log_admin_action(db, admin.id, "审批通过加入申请", "enrollment", enrollment_id)
         return RedirectResponse("/admin/users", status_code=302)

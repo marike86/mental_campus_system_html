@@ -16,8 +16,9 @@ class Submission(Base):
     review_comment = Column(Text, nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     submitted_at = Column(DateTime, server_default=func.now())
-    current_attempt_id = Column(Integer, ForeignKey("submission_attempts.id"), nullable=True)
+    current_attempt_id = Column(Integer, ForeignKey("submission_attempts.id", use_alter=True), nullable=True)
 
     __table_args__ = (
         Index('idx_submission_enrollment_day', 'enrollment_id', 'day_number'),
+        Index('uq_submission_day', 'enrollment_id', 'day_number', unique=True),
     )

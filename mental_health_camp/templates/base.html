@@ -76,7 +76,7 @@
         <!-- 导航菜单 -->
         <nav class="flex-1 overflow-y-auto py-4">
             <div class="px-3 space-y-1"><a class="block px-3 py-3 text-brand-800" href="/user/notifications">站内通知 <span id="notification-count" aria-live="polite"></span></a>
-                {% if user.role in ['admin','super_admin'] %}<a class="block px-3 py-3 text-brand-800" href="/admin/assignments?view=all">审核任务分配</a>{% endif %}
+                {% if user.role in ['admin','super_admin'] %}<a class="block px-3 py-3 text-brand-800" href="/admin/assignments?view=all">审核任务分配</a><a class="block px-3 py-3 text-brand-800" href="/admin/operations">训练营运营</a>{% endif %}
                 <a class="block px-3 py-3 text-brand-800" href="/user/today">课程与进度</a>
                 {% if user.role == 'super_admin' %}
                     <!-- 超级管理员菜单 -->

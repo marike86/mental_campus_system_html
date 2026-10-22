@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, JSON
+from sqlalchemy import Column, Integer, ForeignKey, JSON, Index
 from database import Base
 
 
@@ -9,3 +9,5 @@ class DayForm(Base):
     bootcamp_id = Column(Integer, ForeignKey("bootcamps.id"), nullable=False)
     day_number = Column(Integer, nullable=False)
     questions = Column(JSON, nullable=False, default=list)
+
+    __table_args__ = (Index("uq_day_form", "bootcamp_id", "day_number", unique=True),)

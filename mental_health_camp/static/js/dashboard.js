@@ -13,17 +13,17 @@ function renderCalendarHeatmap(container, calendar) {
     for (var i = 0; i < calendar.length; i++) {
         var day = calendar[i];
         var bgClass, textColor;
-        if (day.status === 'completed') {
+        if (day.status === 'approved') {
             bgClass = 'bg-brand-800';
             textColor = 'text-white';
-        } else if (day.status === 'missed') {
+        } else if (['available','rejected'].includes(day.status)) {
             bgClass = 'bg-red-100';
             textColor = 'text-red-400';
         } else {
             bgClass = 'bg-gray-100';
             textColor = 'text-gray-400';
         }
-        html += '<div class="aspect-square rounded-lg flex items-center justify-center text-xs font-medium ' + bgClass + ' ' + textColor + ' cursor-default" title="第' + day.day + '天 - ' + (day.status === 'completed' ? '已完成' : day.status === 'missed' ? '未完成' : '未到来') + '">' + day.day + '</div>';
+        html += '<div class="aspect-square rounded-lg flex items-center justify-center text-xs font-medium ' + bgClass + ' ' + textColor + ' cursor-default" title="第' + day.day + '天 - ' + ({approved:'已完成',pending:'待审核',available:'可学习',rejected:'需修改',locked:'已锁定',future:'未开始'}[day.status] || '') + '">' + day.day + '</div>';
     }
     html += '</div>';
     html += '<div class="flex items-center space-x-4 mt-3">';
@@ -44,63 +44,30 @@ function renderStreakCounter(container, streak) {
 }
 
 function initLikertChart(canvasId, seriesData) {
-    if (!seriesData || Object.keys(seriesData).length === 0) return;
-    var qid = Object.keys(seriesData)[0];
-    var series = seriesData[qid];
-    var labels = series.data.map(function(d) { return '第' + d.day + '天'; });
-    var values = series.data.map(function(d) { return d.value; });
-    var canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    if (typeof Chart === 'undefined') return;
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: series.label,
-                data: values,
-                borderColor: '#9c0c13',
-                backgroundColor: 'rgba(156,12,19,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointBackgroundColor: '#9c0c13',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-            }]
-        },
+    const entries = Object.entries(seriesData || {});
+    const canvas = document.getElementById(canvasId);
+    if (!entries.length || !canvas || typeof Chart === 'undefined') return;
+    const days = [...new Set(entries.flatMap(([, series]) => series.data.map(point => point.day)))].sort((a,b) => a-b);
+    const colors = ['#9c0c13', '#0891b2', '#7c3aed', '#b45309'];
+    const datasets = entries.map(([key, series], index) => ({
+        label: series.label + (series.version_label ? ' · ' + series.version_label : ''),
+        data: days.map(day => series.data.find(point => point.day === day)?.value ?? null),
+        borderColor: colors[index % colors.length],
+        backgroundColor: colors[index % colors.length],
+        fill: false, spanGaps: false, pointRadius: 5
+    }));
+    const values = datasets.flatMap(series => series.data.filter(value => value !== null));
+    new Chart(canvas.getContext('2d'), {
+        type: 'line', data: {labels: days.map(day => '第' + day + '天'), datasets},
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    min: 0,
-                    max: 6,
-                    ticks: { stepSize: 1, font: { size: 12 } },
-                    grid: { color: 'rgba(0,0,0,0.05)' }
-                },
-                x: {
-                    ticks: { font: { size: 12 } },
-                    grid: { display: false }
+            responsive: true, maintainAspectRatio: false,
+            scales: {y: {min: Math.min(0, ...values), max: Math.max(5, ...values), ticks: {stepSize: 1}}},
+            plugins: {legend: {display: true}, tooltip: {callbacks: {
+                afterLabel: function(context) {
+                    const series = entries[context.datasetIndex][1];
+                    return series.labels?.[context.raw - (series.min ?? 1)] || '';
                 }
-            },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        afterLabel: function(ctx) {
-                            var idx = ctx.dataIndex;
-                            var dayVal = series.data[idx].value;
-                            var labelsList = series.labels;
-                            if (labelsList && labelsList.length >= dayVal) {
-                                return labelsList[dayVal - 1];
-                            }
-                            return '';
-                        }
-                    }
-                }
-            }
+            }}}
         }
     });
 }

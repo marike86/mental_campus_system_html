@@ -53,7 +53,7 @@ def progress(db, enrollment):
     if not camp:
         raise HTTPException(404, "训练营不存在")
     subs = {s.day_number:s for s in db.query(Submission).filter_by(enrollment_id=enrollment.id)}
-    published = {d.day_number for d in db.query(DayForm).join(DayFormVersion, DayFormVersion.day_form_id==DayForm.id).filter(DayForm.bootcamp_id==camp.id)}
+    published = {d.day_number for d in db.query(DayForm).join(DayFormVersion, DayFormVersion.day_form_id==DayForm.id).filter(DayForm.bootcamp_id==camp.id, DayFormVersion.questions != "[]")}
     published.update(d.day_number for d in db.query(EnrollmentDay).filter_by(enrollment_id=enrollment.id))
     return camp, states(enrollment, camp, subs, published)
 
@@ -70,6 +70,7 @@ def can_work(db, enrollment, day):
 
 def start(db, enrollment, day):
     write_lock(db)
+    db.refresh(enrollment)
     can_work(db, enrollment, day)
     version = bound_version(db, enrollment.id, day)
     if version:
@@ -116,6 +117,7 @@ def parse_answers(questions, form):
 
 def submit(db, enrollment, day, form):
     write_lock(db)
+    db.refresh(enrollment)
     can_work(db, enrollment, day)
     version = bound_version(db, enrollment.id, day)
     if not version or str(version.id) != str(form.get('version_id','')):
@@ -134,6 +136,8 @@ def submit(db, enrollment, day, form):
     sub.current_attempt_id = attempt.id
     sub.answers, sub.submitted_at, sub.review_status = attempt.answers, attempt.submitted_at, 'pending'
     sub.reviewer_id = sub.review_comment = sub.reviewed_at = None
+    from services.metrics import record_eligibility
+    record_eligibility(db, enrollment.id, submitted=True)
     return sub
 
 

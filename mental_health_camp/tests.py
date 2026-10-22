@@ -25,6 +25,9 @@ from models.user_badge import UserBadge
 from models.badge import Badge
 from models.day_form import DayForm
 from models.audit_log import AuditLog
+from models.workflow import DayFormVersion, EnrollmentDay, SubmissionAttempt
+from services.clock import now
+from services.versions import bound_version
 from auth import create_access_token, get_password_hash, verify_password, _extract_user_id, verify_csrf
 from config import JWT_SECRET_KEY, JWT_ALGORITHM
 from utils.crypto import encrypt_data, decrypt_data
@@ -143,6 +146,15 @@ def _create_enrollment(db, user_id, bootcamp_id, batch_id=None):
     db.add(enrollment)
     db.commit()
     db.refresh(enrollment)
+    for form in db.query(DayForm).filter_by(bootcamp_id=bootcamp_id):
+        if not form.questions or any('type' not in q for q in form.questions):
+            continue
+        version = db.query(DayFormVersion).filter_by(day_form_id=form.id).first()
+        if not version:
+            version=DayFormVersion(day_form_id=form.id,version=1,questions=form.questions,published_at=now())
+            db.add(version);db.flush()
+        db.add(EnrollmentDay(enrollment_id=enrollment.id,day_number=form.day_number,version_id=version.id,started_at=now()))
+    db.commit()
     return enrollment
 
 
@@ -154,6 +166,19 @@ def _create_submission(db, enrollment_id, day_number, answers=None):
     db.add(submission)
     db.commit()
     db.refresh(submission)
+    enrollment=db.get(Enrollment,enrollment_id)
+    version=bound_version(db,enrollment_id,day_number)
+    if not version:
+        form=db.query(DayForm).filter_by(bootcamp_id=enrollment.bootcamp_id,day_number=day_number).first()
+        if not form:
+            form=DayForm(bootcamp_id=enrollment.bootcamp_id,day_number=day_number,questions=[])
+            db.add(form);db.flush()
+        version=DayFormVersion(day_form_id=form.id,version=1,questions=form.questions,published_at=now(),legacy=True)
+        db.add(version);db.flush()
+        db.add(EnrollmentDay(enrollment_id=enrollment_id,day_number=day_number,version_id=version.id))
+    attempt=SubmissionAttempt(submission_id=submission.id,round_number=1,version_id=version.id,answers=encrypted,
+                              submitted_at=submission.submitted_at,review_status=submission.review_status)
+    db.add(attempt);db.flush();submission.current_attempt_id=attempt.id;db.commit()
     return submission
 
 
@@ -1107,9 +1132,9 @@ class TestDayFormOperations:
             resp = client.post(f"/admin/bootcamp/{bootcamp.id}/day/1", data={
                 "questions": "not valid json",
             }, follow_redirects=False)
-            assert resp.status_code == 302
+            assert resp.status_code == 400
             db.refresh(df)
-            assert df.questions == []
+            assert df.questions == [{"id": "old"}]
         finally:
             db.close()
 
@@ -1585,8 +1610,9 @@ class TestFormSubmission:
             _login_user(user)
             resp = client.post(f"/user/form/{enrollment.id}/1", data={
                 "q_q1": "我的答案",
+                "version_id": bound_version(db,enrollment.id,1).id,
             }, follow_redirects=False)
-            assert resp.status_code == 302
+            assert resp.status_code == 303
             submission = db.query(Submission).filter(
                 Submission.enrollment_id == enrollment.id,
                 Submission.day_number == 1,
@@ -1609,7 +1635,7 @@ class TestFormSubmission:
             resp = client.post(f"/user/form/{enrollment.id}/1", data={
                 "q_q1": "新答案",
             }, follow_redirects=False)
-            assert resp.status_code == 302
+            assert resp.status_code == 409
             count = db.query(Submission).filter(
                 Submission.enrollment_id == enrollment.id,
                 Submission.day_number == 1,
