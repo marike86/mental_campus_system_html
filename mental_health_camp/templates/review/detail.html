@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}审核详情 - {{ APP_NAME }}{% endblock %}
-{% block content %}
+{% block content %}<p class="mb-4">第 {{attempt.round_number}} 次提交 · 课程版本 {{version.version}}{% if version.legacy %} · 历史导入版本{% endif %}</p>
 <div class="space-y-6 fade-in">
     <div class="mb-2">
         <a href="/review/pending" class="text-brand-800 hover:text-brand-700 text-sm font-medium inline-flex items-center space-x-1">
@@ -17,7 +17,7 @@
             </p>
         </div>
         <div>
-            {% if submission.review_status == 'pending' %}
+            {% if submission.review_status == 'pending' and is_current %}
             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">待审核</span>
             {% elif submission.review_status == 'approved' %}
             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">已通过</span>
@@ -96,19 +96,19 @@
     </div>
 
     <!-- 审核操作 -->
-    {% if submission.review_status == 'pending' %}
+    {% if submission.review_status == 'pending' and is_current %}
     <div class="bg-white rounded-2xl shadow-sm p-4 md:p-8">
         <h2 class="text-lg font-bold text-gray-900 mb-6">审核操作</h2>
         <div class="flex flex-col sm:flex-row gap-4">
-            <form method="POST" action="/review/{{ submission.id }}/approve" class="sm:flex-1">
+            <form method="POST" action="/review/{{ submission.id }}/approve" class="sm:flex-1"><input type="hidden" name="attempt_id" value="{{attempt.id}}"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}">
                 <button type="submit" class="min-h-[44px] w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     <span>审核通过</span>
                 </button>
             </form>
 
-            <form method="POST" action="/review/{{ submission.id }}/reject" class="sm:flex-1">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <form method="POST" action="/review/{{ submission.id }}/reject" class="sm:flex-1"><input type="hidden" name="attempt_id" value="{{attempt.id}}"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}">
+                <input type="hidden" name="attempt_id" value="{{attempt.id}}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">不通过原因（可选）</label>
                     <textarea name="comment" rows="3" placeholder="请输入不通过的原因，以便用户修改后重新提交..."

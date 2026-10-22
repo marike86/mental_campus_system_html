@@ -76,6 +76,8 @@
         <!-- 导航菜单 -->
         <nav class="flex-1 overflow-y-auto py-4">
             <div class="px-3 space-y-1">
+                {% if user.role in ['admin','super_admin'] %}<a class="block px-3 py-3 text-brand-800" href="/admin/assignments?view=all">审核任务分配</a>{% endif %}
+                <a class="block px-3 py-3 text-brand-800" href="/user/today">课程与进度</a>
                 {% if user.role == 'super_admin' %}
                     <!-- 超级管理员菜单 -->
                     <a href="/admin/dashboard" class="flex items-center px-3 py-2.5 rounded-lg text-gray-600 hover:text-brand-800 hover:bg-brand-50 transition-colors">

@@ -15,8 +15,10 @@ router = APIRouter(tags=["auth"])
 @router.get("/login")
 async def login_page(request: Request, current_user: User = Depends(get_optional_user), registered: str = None):
     if current_user:
-        if current_user.role == "admin":
+        if current_user.role in ("admin", "super_admin"):
             return RedirectResponse("/admin/bootcamps", status_code=302)
+        if current_user.role == "reviewer":
+            return RedirectResponse("/review/pending?view=mine", status_code=302)
         return RedirectResponse("/user/dashboard", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request, "app_name": APP_NAME, "registered": registered})
 
@@ -39,8 +41,10 @@ async def login_submit(
     user.last_login = datetime.now(timezone.utc)
     db.commit()
     token = create_access_token({"sub": user.id})
-    if user.role == "admin":
+    if user.role in ("admin", "super_admin"):
         response = RedirectResponse("/admin/bootcamps", status_code=302)
+    elif user.role == "reviewer":
+        response = RedirectResponse("/review/pending?view=mine", status_code=302)
     else:
         response = RedirectResponse("/user/dashboard", status_code=302)
     response.set_cookie(
