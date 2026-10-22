@@ -21,27 +21,12 @@ def check_and_send_reminders(db: Session):
             continue
         enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
         pending_tasks = []
+        from services.courses import progress
         for e in enrollments:
-            bootcamp = db.query(Bootcamp).filter(Bootcamp.id == e.bootcamp_id).first()
-            if not bootcamp or not bootcamp.is_active:
-                continue
-            day_number = (today - e.start_date).days + 1
-            if day_number < 1 or day_number > bootcamp.days:
-                continue
-            day_form = db.query(DayForm).filter(
-                DayForm.bootcamp_id == bootcamp.id, DayForm.day_number == day_number
-            ).first()
-            if not day_form:
-                continue
-            existing = db.query(Submission).filter(
-                Submission.enrollment_id == e.id, Submission.day_number == day_number
-            ).first()
-            if not existing:
-                pending_tasks.append({
-                    "bootcamp_name": bootcamp.name,
-                    "day_number": day_number,
-                    "form_url": f"/user/form/{e.id}/{day_number}",
-                })
+            camp, days = progress(db, e)
+            for item in days:
+                if item['actionable']:
+                    pending_tasks.append(dict(bootcamp_name=camp.name, day_number=item['day'], form_url=item['url']))
         if pending_tasks:
             if send_daily_reminder(user.email, user.nickname, pending_tasks):
                 sent_count += 1

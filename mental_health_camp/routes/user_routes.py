@@ -17,6 +17,11 @@ from templates_config import templates
 from utils.crypto import encrypt_data, decrypt_data
 from utils.sanitize import sanitize_text, validate_password_strength
 
+from types import SimpleNamespace
+from services.clock import local_date
+from services import courses
+from services.versions import bound_version, submission_questions
+from models.workflow import SubmissionAttempt, DayFormVersion
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,7 +37,7 @@ async def user_dashboard(request: Request, current_user: User = Depends(get_curr
         bootcamp = db.query(Bootcamp).filter(Bootcamp.id == e.bootcamp_id).first()
         if not bootcamp:
             continue
-        completed = db.query(Submission).filter(Submission.enrollment_id == e.id).count()
+        completed = db.query(Submission).filter(Submission.enrollment_id == e.id, Submission.review_status == "approved").count()
         percentage = int((completed / bootcamp.days * 100)) if bootcamp.days > 0 else 0
         bootcamp_data.append({"enrollment": e, "bootcamp": bootcamp, "percentage": percentage, "completed": completed})
     return templates.TemplateResponse("user/dashboard.html", {
@@ -42,196 +47,101 @@ async def user_dashboard(request: Request, current_user: User = Depends(get_curr
 
 @router.get("/today")
 async def today_tasks(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    today = date.today()
-    enrollments = db.query(Enrollment).filter(Enrollment.user_id == current_user.id).all()
-    tasks = []
-    for e in enrollments:
-        bootcamp = db.query(Bootcamp).filter(Bootcamp.id == e.bootcamp_id).first()
-        if not bootcamp or not bootcamp.is_active:
-            continue
-        day_number = (today - e.start_date).days + 1
-        if day_number < 1 or day_number > bootcamp.days:
-            continue
-        day_form = db.query(DayForm).filter(
-            DayForm.bootcamp_id == bootcamp.id, DayForm.day_number == day_number
-        ).first()
-        if not day_form:
-            continue
-        existing = db.query(Submission).filter(
-            Submission.enrollment_id == e.id, Submission.day_number == day_number
-        ).first()
-        tasks.append({
-            "enrollment": e, "bootcamp": bootcamp, "day_form": day_form,
-            "day_number": day_number, "submitted": existing is not None,
-        })
-    return templates.TemplateResponse("user/today.html", {
-        "request": request, "user": current_user, "app_name": APP_NAME, "tasks": tasks,
-    })
+    enrollments = db.query(Enrollment).filter_by(user_id=current_user.id).all()
+    groups = []
+    for enrollment in enrollments:
+        camp, items = courses.progress(db, enrollment)
+        groups.append(dict(enrollment=enrollment, camp=camp, items=[x for x in items if x['status'] != 'approved']))
+    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=groups))
+
+
+@router.get("/course/{enrollment_id}")
+async def course_overview(request: Request, enrollment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    camp, items = courses.progress(db, enrollment)
+    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=[dict(enrollment=enrollment, camp=camp, items=items)]))
+
+
+@router.get("/api/progress/{enrollment_id}")
+async def course_progress(enrollment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    camp, items = courses.progress(db, enrollment)
+    return dict(days=items, completed_days=sum(x['status']=='approved' for x in items), total_days=camp.days,
+                next_action=next((x for x in items if x['actionable']), None))
+
+
+@router.post("/course/{enrollment_id}/{day}/start")
+async def start_course(enrollment_id: int, day: int, current_user: User=Depends(get_current_user), db: Session=Depends(get_db), csrf=Depends(verify_csrf)):
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    courses.start(db, enrollment, day)
+    db.commit()
+    return RedirectResponse(f"/user/form/{enrollment_id}/{day}", 303)
+
+
+def form_context(db, enrollment, day, current_user, request):
+    camp, items = courses.progress(db, enrollment)
+    item = next((x for x in items if x['day']==day), None)
+    if item is None:
+        raise HTTPException(404, "表单不存在")
+    version = bound_version(db, enrollment.id, day)
+    sub = db.query(Submission).filter_by(enrollment_id=enrollment.id, day_number=day).first()
+    existing = None
+    if sub:
+        existing = SimpleNamespace(id=sub.id, day_number=day, answers=decrypt_data(sub.answers),
+                                   review_status=sub.review_status, review_comment=sub.review_comment,
+                                   submitted_at=sub.submitted_at)
+    context = dict(request=request, user=current_user, app_name=APP_NAME, enrollment=enrollment, bootcamp=camp,
+                   day_number=day, state=item, version=version, version_id=version.id if version else None, existing=existing,
+                   draft_key=f"answers:{current_user.id}:{enrollment.id}:{day}:{version.id}" if version else "")
+    if version:
+        context.update(day_form=SimpleNamespace(questions=version.questions), questions_json=version.questions)
+    return context
 
 
 @router.get("/form/{enrollment_id}/{day}")
 async def fill_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id, Enrollment.user_id == current_user.id).first()
-    if not enrollment:
-        raise HTTPException(status_code=404, detail="训练营不存在")
-    bootcamp = db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first()
-    day_form = db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp.id, DayForm.day_number == day).first()
-    if not day_form:
-        raise HTTPException(status_code=404, detail="表单不存在")
-    existing = db.query(Submission).filter(Submission.enrollment_id == enrollment_id, Submission.day_number == day).first()
-    decrypted_existing = None
-    if existing:
-        class _Dec:
-            def __init__(self, sub):
-                self.id = sub.id
-                self.day_number = sub.day_number
-                self.submitted_at = sub.submitted_at
-                self.review_status = sub.review_status
-                self.review_comment = sub.review_comment
-                self.answers = decrypt_data(sub.answers) if sub.review_status != "rejected" else decrypt_data(sub.answers)
-        decrypted_existing = _Dec(existing)
-    questions = day_form.questions or []
-    has_reading = any(q.get("type") == "reading" for q in questions)
-    # 如果是被拒绝的提交，显示表单让用户修改
-    if has_reading and not decrypted_existing:
-        return templates.TemplateResponse("user/camp_content.html", {
-            "request": request, "user": current_user, "app_name": APP_NAME,
-            "enrollment": enrollment, "bootcamp": bootcamp, "day_form": day_form,
-            "day_number": day, "questions_json": questions,
-        })
-    return templates.TemplateResponse("user/form.html", {
-        "request": request, "user": current_user, "app_name": APP_NAME,
-        "enrollment": enrollment, "bootcamp": bootcamp, "day_form": day_form,
-        "day_number": day, "existing": decrypted_existing,
-    })
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    context = form_context(db, enrollment, day, current_user, request)
+    if not context['version'] or (context['existing'] is None and not context['state']['actionable']):
+        return templates.TemplateResponse("user/start.html", context)
+    reading = any(q.get('type')=='reading' for q in context['questions_json'])
+    editable = context['state']['actionable']
+    if reading and editable:
+        return templates.TemplateResponse("user/camp_content.html", context)
+    context['can_edit'] = editable
+    return templates.TemplateResponse("user/form.html", context)
 
 
 @router.post("/form/{enrollment_id}/{day}")
 async def submit_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
-    enrollment = db.query(Enrollment).filter(Enrollment.id == enrollment_id, Enrollment.user_id == current_user.id).first()
-    if not enrollment:
-        raise HTTPException(status_code=404, detail="训练营不存在")
-    existing = db.query(Submission).filter(Submission.enrollment_id == enrollment_id, Submission.day_number == day).first()
-    # 如果已通过或待审核，不允许重新提交
-    if existing and existing.review_status != "rejected":
-        return RedirectResponse(f"/user/form/{enrollment_id}/{day}", status_code=302)
-    day_form = db.query(DayForm).filter(
-        DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == day
-    ).first()
-    bootcamp = db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first()
-    if not day_form or not bootcamp or day < 1 or day > bootcamp.days:
-        raise HTTPException(status_code=404, detail="表单不存在")
-    # 检查是否需要按顺序提交
-    if day > 1:
-        prev_submission = db.query(Submission).filter(
-            Submission.enrollment_id == enrollment_id,
-            Submission.day_number == day - 1,
-            Submission.review_status == "approved"
-        ).first()
-        if not prev_submission:
-            raise HTTPException(status_code=400, detail="请先完成并等待通过前一天的表单")
-    # 检查必填项
-    form_data = await request.form()
-    answers = {}
-    if day_form:
-        for q in day_form.questions:
-            qid = q["id"]
-            if q["type"] == "multiple":
-                answers[qid] = form_data.getlist(f"q_{qid}")
-            elif q["type"] == "likert":
-                val = form_data.get(f"q_{qid}")
-                try:
-                    answers[qid] = int(val) if val else None
-                except (TypeError, ValueError):
-                    raise HTTPException(status_code=400, detail="量表答案必须为整数")
-                if answers[qid] is not None and not q.get("min", 1) <= answers[qid] <= q.get("max", 5):
-                    raise HTTPException(status_code=400, detail="量表答案超出范围")
-            else:
-                if qid not in answers:
-                    answers[qid] = form_data.get(f"q_{qid}", "")
-            # 验证必填项
-            if q.get("required") and q["type"] != "reading":
-                answer = answers.get(qid)
-                if answer is None or answer == "" or (isinstance(answer, str) and not answer.strip()) or (isinstance(answer, list) and len(answer) == 0):
-                    return templates.TemplateResponse("user/form.html", {
-                        "request": request, "user": current_user, "app_name": APP_NAME,
-                        "enrollment": enrollment, "bootcamp": db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first(),
-                        "day_form": day_form, "day_number": day, "existing": None,
-                        "error": f"题目「{q.get('label', '')}」为必填项",
-                    })
-    encrypted_answers = encrypt_data(answers)
-    if existing:
-        # 保留记录 ID 和任务关联，所有校验成功后才更新旧答案。
-        from datetime import datetime, timezone
-        from models.review_assignment import ReviewAssignment
-        existing.answers = encrypted_answers
-        existing.review_status = "pending"
-        existing.reviewer_id = None
-        existing.review_comment = None
-        existing.reviewed_at = None
-        existing.submitted_at = datetime.now(timezone.utc)
-        db.query(ReviewAssignment).filter(
-            ReviewAssignment.submission_id == existing.id,
-            ReviewAssignment.status == "pending",
-        ).update({"status": "expired"}, synchronize_session=False)
-    else:
-        db.add(Submission(
-            enrollment_id=enrollment_id,
-            day_number=day,
-            answers=encrypted_answers,
-            review_status="pending"
-        ))
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    form = await request.form()
+    courses.submit(db, enrollment, day, form)
     db.commit()
-    _check_and_award_badges(db, current_user, enrollment)
-    return RedirectResponse(f"/user/history/{enrollment_id}", status_code=302)
+    return RedirectResponse(f"/user/history/{enrollment_id}?submitted_day={day}", 303)
 
 
 @router.post("/api/verify-answer")
-async def verify_answer(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
+async def verify_answer(request: Request, current_user: User=Depends(get_current_user), db: Session=Depends(get_db), csrf=Depends(verify_csrf)):
     try:
         body = await request.json()
-        enrollment_id = body.get("enrollment_id")
-        day_number = body.get("day_number")
-        question_id = body.get("question_id")
-        answer = body.get("answer")
-        if not all([enrollment_id, day_number, question_id]):
-            return JSONResponse(status_code=400, content={"correct": False, "message": "参数不完整"})
-        enrollment = db.query(Enrollment).filter(
-            Enrollment.id == int(enrollment_id), Enrollment.user_id == current_user.id
-        ).first()
-        if not enrollment:
-            return JSONResponse(status_code=404, content={"correct": False, "message": "训练营不存在"})
-        day_form = db.query(DayForm).filter(
-            DayForm.bootcamp_id == enrollment.bootcamp_id, DayForm.day_number == int(day_number)
-        ).first()
-        if not day_form:
-            return JSONResponse(status_code=404, content={"correct": False, "message": "表单不存在"})
-        target_q = None
-        for q in (day_form.questions or []):
-            if q.get("id") == question_id:
-                target_q = q
-                break
-        if not target_q:
-            return JSONResponse(status_code=404, content={"correct": False, "message": "题目不存在"})
-        correct = target_q.get("correct")
-        if correct is None:
-            return JSONResponse(content={"correct": True, "message": "该题无需验证"})
-        if target_q["type"] == "single":
-            is_correct = answer == correct
-        elif target_q["type"] == "multiple":
-            if isinstance(answer, list) and isinstance(correct, list):
-                is_correct = set(answer) == set(correct)
-            else:
-                is_correct = False
-        else:
-            is_correct = True
-        if is_correct:
-            return JSONResponse(content={"correct": True, "message": "回答正确！"})
-        else:
-            return JSONResponse(content={"correct": False, "message": "回答有误，请再试一次"})
-    except Exception as e:
-        logger.exception("验证答案失败: %s", e)
-        return JSONResponse(status_code=500, content={"correct": False, "message": "验证失败，请稍后重试"})
+        enrollment_id, day = int(body['enrollment_id']), int(body['day_number'])
+        qid, answer = body['question_id'], body.get('answer')
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(400, "参数不完整或格式错误")
+    enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
+    courses.can_work(db, enrollment, day)
+    version = bound_version(db, enrollment.id, day)
+    if not version:
+        raise HTTPException(409, "请先开始课程")
+    question = next((q for q in version.questions if q['id']==qid), None)
+    if not question:
+        raise HTTPException(404, "题目不存在")
+    correct = question.get('correct')
+    is_correct = True
+    if correct is not None:
+        is_correct = (isinstance(answer,list) and set(answer)==set(correct)) if question['type']=='multiple' else answer==correct
+    return dict(correct=is_correct, message="回答正确！" if is_correct else "回答有误，请再试一次")
 
 
 @router.get("/bootcamps")
@@ -268,7 +178,7 @@ async def join_bootcamp(request: Request, bootcamp_id: int, current_user: User =
         enrollment = Enrollment(
             user_id=current_user.id,
             bootcamp_id=bootcamp_id,
-            start_date=date.today(),
+            start_date=local_date(),
         )
         db.add(enrollment)
         db.commit()
@@ -288,7 +198,7 @@ async def my_progress(request: Request, current_user: User = Depends(get_current
         bootcamp = db.query(Bootcamp).filter(Bootcamp.id == e.bootcamp_id).first()
         if not bootcamp:
             continue
-        completed = db.query(Submission).filter(Submission.enrollment_id == e.id).count()
+        completed = db.query(Submission).filter(Submission.enrollment_id == e.id, Submission.review_status == "approved").count()
         percentage = int((completed / bootcamp.days * 100)) if bootcamp.days > 0 else 0
         bootcamp_data.append({"enrollment": e, "bootcamp": bootcamp, "percentage": percentage, "completed": completed})
     return templates.TemplateResponse("user/dashboard.html", {
@@ -307,21 +217,22 @@ async def history(request: Request, enrollment_id: int, current_user: User = Dep
     for df in db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp.id).all():
         day_forms[df.day_number] = df
     records = []
-    for s in submissions:
-        from types import SimpleNamespace
-        from services.versions import submission_questions
-        df = SimpleNamespace(questions=submission_questions(db, s))
-        decrypted_answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
-        record_submission = {
-            "id": s.id,
-            "day_number": s.day_number,
-            "submitted_at": s.submitted_at,
-            "review_status": s.review_status,
-            "review_comment": s.review_comment,
-            "answers": decrypted_answers
-        }
-        records.append({"submission": record_submission, "day_form": df})
+    for sub in submissions:
+        for attempt in db.query(SubmissionAttempt).filter_by(submission_id=sub.id).order_by(SubmissionAttempt.round_number):
+            version = db.get(DayFormVersion, attempt.version_id)
+            record = dict(id=sub.id, day_number=sub.day_number, submitted_at=attempt.submitted_at,
+                          answers=decrypt_data(attempt.answers), review_status=attempt.review_status,
+                          review_comment=attempt.review_comment, round_number=attempt.round_number, version=version.version,
+                          legacy=version.legacy)
+            records.append(dict(submission=record, day_form=SimpleNamespace(questions=version.questions)))
+    clear_key = None
+    submitted_day = request.query_params.get('submitted_day', '')
+    if submitted_day.isdigit():
+        version = bound_version(db, enrollment.id, int(submitted_day))
+        if version and any(s.day_number==int(submitted_day) for s in submissions):
+            clear_key = f"answers:{current_user.id}:{enrollment.id}:{int(submitted_day)}:{version.id}"
     return templates.TemplateResponse("user/history.html", {
+        "draft_key_to_clear": clear_key,
         "request": request, "user": current_user, "app_name": APP_NAME,
         "enrollment": enrollment, "bootcamp": bootcamp, "records": records,
     })
@@ -386,62 +297,19 @@ async def notification_toggle(request: Request, current_user: User = Depends(get
 
 
 def _check_and_award_badges(db: Session, user: User, enrollment: Enrollment):
-    from config import BADGE_STREAK_3_DAYS, BADGE_STREAK_7_DAYS
-    submissions = db.query(Submission).filter(Submission.enrollment_id == enrollment.id).all()
-    submitted_days = {s.day_number for s in submissions}
-    bootcamp = db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first()
-    if not bootcamp:
-        return
-    today = date.today()
-    today_number = (today - enrollment.start_date).days + 1
-    
-    all_badges = db.query(Badge).all()
-    badges_by_type = {}
-    for badge in all_badges:
-        badge_type = badge.criteria.get("type") if badge.criteria else None
-        if badge_type:
-            if badge_type not in badges_by_type:
-                badges_by_type[badge_type] = []
-            badges_by_type[badge_type].append(badge)
-    
-    first_badges = badges_by_type.get("first_submission", [])
-    first_badge = first_badges[0] if first_badges else None
-    if first_badge and len(submissions) >= 1:
-        existing = db.query(UserBadge).filter(
-            UserBadge.user_id == user.id, UserBadge.badge_id == first_badge.id,
-            UserBadge.enrollment_id == enrollment.id
-        ).first()
-        if not existing:
-            db.add(UserBadge(user_id=user.id, badge_id=first_badge.id, enrollment_id=enrollment.id))
-    streak = 0
-    check_date = today
-    for _ in range(bootcamp.days):
-        d = (check_date - enrollment.start_date).days + 1
-        if d < 1:
-            break
-        if d in submitted_days:
-            streak += 1
-            check_date -= timedelta(days=1)
-        else:
-            break
-    streak_badges = badges_by_type.get("streak", [])
-    for sb in streak_badges:
-        required_days = sb.criteria.get("days", 3)
-        if streak >= required_days:
-            existing = db.query(UserBadge).filter(
-                UserBadge.user_id == user.id, UserBadge.badge_id == sb.id,
-                UserBadge.enrollment_id == enrollment.id
-            ).first()
-            if not existing:
-                db.add(UserBadge(user_id=user.id, badge_id=sb.id, enrollment_id=enrollment.id))
-    if len(submitted_days) >= bootcamp.days:
-        complete_badges = badges_by_type.get("bootcamp_complete", [])
-        complete_badge = complete_badges[0] if complete_badges else None
-        if complete_badge:
-            existing = db.query(UserBadge).filter(
-                UserBadge.user_id == user.id, UserBadge.badge_id == complete_badge.id,
-                UserBadge.enrollment_id == enrollment.id
-            ).first()
-            if not existing:
-                db.add(UserBadge(user_id=user.id, badge_id=complete_badge.id, enrollment_id=enrollment.id))
-    db.commit()
+    from services.courses import streak
+    submissions = db.query(Submission).filter_by(enrollment_id=enrollment.id, review_status='approved').all()
+    camp = db.get(Bootcamp, enrollment.bootcamp_id)
+    days = sorted({local_date(s.submitted_at) for s in submissions})
+    longest = run = 0
+    previous = None
+    for day in days:
+        run = run+1 if previous and day-previous==timedelta(days=1) else 1
+        longest = max(longest, run)
+        previous = day
+    for badge in db.query(Badge).all():
+        criteria = badge.criteria or {}
+        kind = criteria.get('type')
+        earned = kind=='first_submission' and bool(submissions) or kind=='streak' and longest>=criteria.get('days',3) or kind=='bootcamp_complete' and len({s.day_number for s in submissions})>=camp.days
+        if earned and not db.query(UserBadge).filter_by(user_id=user.id, badge_id=badge.id, enrollment_id=enrollment.id).first():
+            db.add(UserBadge(user_id=user.id, badge_id=badge.id, enrollment_id=enrollment.id))

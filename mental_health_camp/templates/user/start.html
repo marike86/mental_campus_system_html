@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block content %}<section class="bg-white rounded-xl p-6 max-w-xl mx-auto">
+<h1 class="text-2xl font-bold">{{bootcamp.name}} · 第 {{day_number}} 天</h1><p class="my-4">{{state.label}} · {{state.scheduled_date or '开课日期待安排'}}</p>
+{% if state.reason %}<p class="text-amber-700">{{state.reason}}</p>{% endif %}
+{% if state.actionable %}<p class="my-4">开始后将保留当前课程版本，后续更新不会改变你已开始的内容。</p><form method="post" action="/user/course/{{enrollment.id}}/{{day_number}}/start"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}"><button class="bg-brand-800 text-white px-5 py-3 rounded-lg">开始学习</button></form>{% endif %}
+<a class="inline-block mt-4 text-brand-800" href="/user/course/{{enrollment.id}}">查看完整课程</a></section>{% endblock %}

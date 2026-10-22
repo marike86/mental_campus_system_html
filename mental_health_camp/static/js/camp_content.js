@@ -5,9 +5,11 @@ class CampStepManager {
         this.dayNumber = options.dayNumber;
         this.formAction = options.formAction;
         this.csrfToken = options.csrfToken;
+        this.versionId = options.versionId;
+        this.draftKey = options.draftKey;
         this.currentStep = 0;
         this.steps = this._buildSteps();
-        this.answers = {};
+        this.answers = (typeof readAnswerDraft === "function" ? readAnswerDraft(this.draftKey) : null) || options.initialAnswers || {};
         this.verifiedSteps = new Set();
         this._render();
     }
@@ -166,10 +168,10 @@ class CampStepManager {
     }
 
     _renderLikert(q, disabled) {
-        var min = q.min || 1;
-        var max = q.max || 5;
+        var min = q.min ?? 1;
+        var max = q.max ?? 5;
         var labels = q.labels || [];
-        var selected = this.answers[q.id] || null;
+        var selected = Number(this.answers[q.id] ?? -1);
         var html = '<div class="flex items-center justify-between space-x-2 mt-2">';
         for (var i = min; i <= max; i++) {
             var isActive = selected === i;
@@ -196,6 +198,7 @@ class CampStepManager {
         html += '<p class="text-gray-500 mb-6">点击下方按钮提交你的回答</p>';
         html += '<form id="camp-submit-form" method="POST" action="' + this.formAction + '">';
         html += '<input type="hidden" name="csrf_token" value="' + this._esc(this.csrfToken) + '">';
+        html += '<input type="hidden" name="version_id" value="' + this.versionId + '">';
         for (var key in this.answers) {
             var val = this.answers[key];
             if (Array.isArray(val)) {
@@ -221,6 +224,8 @@ class CampStepManager {
 
     setAnswer(qid, value) {
         this.answers[qid] = value;
+        if (typeof writeAnswerDraft === "function") writeAnswerDraft(this.draftKey, this.answers);
+        this.verifiedSteps.delete(this.currentStep);
     }
 
     toggleMulti(qid, value, checked) {
@@ -229,10 +234,13 @@ class CampStepManager {
         var idx = arr.indexOf(value);
         if (checked && idx === -1) { arr.push(value); }
         else if (!checked && idx !== -1) { arr.splice(idx, 1); }
+        if (typeof writeAnswerDraft === 'function') writeAnswerDraft(this.draftKey, this.answers);
+        this.verifiedSteps.delete(this.currentStep);
     }
 
     updateLikertUI(qid, val) {
-        var min = 1, max = 5;
+        var question = this.questions.find(q => q.id === qid);
+        var min = question?.min ?? 1, max = question?.max ?? 5;
         for (var i = min; i <= max; i++) {
             var btn = document.getElementById('likert_camp_' + qid + '_' + i);
             if (!btn) continue;
