@@ -75,7 +75,7 @@
 
         <!-- 导航菜单 -->
         <nav class="flex-1 overflow-y-auto py-4">
-            <div class="px-3 space-y-1">
+            <div class="px-3 space-y-1"><a class="block px-3 py-3 text-brand-800" href="/user/notifications">站内通知 <span id="notification-count" aria-live="polite"></span></a>
                 {% if user.role in ['admin','super_admin'] %}<a class="block px-3 py-3 text-brand-800" href="/admin/assignments?view=all">审核任务分配</a>{% endif %}
                 <a class="block px-3 py-3 text-brand-800" href="/user/today">课程与进度</a>
                 {% if user.role == 'super_admin' %}
@@ -329,5 +329,8 @@
             {% block content %}{% endblock %}
         </div>
     </main>
-</body>
+{% if user %}<script>
+async function refreshNotificationCount() { try { const r = await fetch('/user/api/notifications/unread-count'); if (!r.ok || !r.headers.get('content-type')?.includes('application/json')) return; const data = await r.json(); const el = document.getElementById('notification-count'); if (el) el.textContent = data.count ? '('+data.count+')' : ''; } catch (_) {} }
+refreshNotificationCount(); setInterval(refreshNotificationCount, 60000);
+</script>{% endif %}</body>
 </html>

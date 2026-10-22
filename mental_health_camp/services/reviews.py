@@ -90,6 +90,8 @@ def decide(db, submission_id, attempt_id, actor, result, comment=''):
         from routes.user_routes import _check_and_award_badges
         enrollment = db.get(Enrollment, sub.enrollment_id)
         _check_and_award_badges(db, db.get(User, enrollment.user_id), enrollment)
+    from services.inbox import review_result
+    review_result(db, sub, attempt, result, comment.strip())
     return sub, attempt
 
 
