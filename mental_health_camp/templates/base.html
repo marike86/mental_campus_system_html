@@ -56,8 +56,10 @@
             .tablet-grid-2 { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
+    <link rel="stylesheet" href="/static/css/interface.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
+    <a class="skip-link" href="#main-content">跳转到主要内容</a>
     {% if user %}
     <!-- 已登录：左侧固定导航栏 -->
     <aside id="sidebar" class="fixed left-0 top-0 w-64 h-full bg-white shadow-lg z-50 flex flex-col -translate-x-full md:translate-x-0 transition-transform duration-300">
@@ -73,6 +75,7 @@
             </a>
         </div>
 
+        <button type="button" id="mobile-close" class="mobile-close" aria-label="关闭菜单">×</button>
         <!-- 导航菜单 -->
         <nav class="flex-1 overflow-y-auto py-4">
             <div class="px-3 space-y-1"><a class="block px-3 py-3 text-brand-800" href="/user/notifications">站内通知 <span id="notification-count" aria-live="polite"></span></a>
@@ -251,53 +254,20 @@
     </aside>
 
     <!-- 移动端菜单按钮 -->
-    <button id="mobile-menu-btn" class="fixed top-3 left-3 z-50 md:hidden bg-white rounded-xl shadow-lg p-3 text-gray-600 hover:text-gray-900 focus:outline-none active:bg-gray-50 transition-colors" aria-label="打开菜单" style="min-width:44px;min-height:44px;">
+    <header class="mobile-topbar">
+    <button id="mobile-menu-btn" class="fixed top-3 left-3 z-50 md:hidden bg-white rounded-xl shadow-lg p-3 text-gray-600 hover:text-gray-900 focus:outline-none active:bg-gray-50 transition-colors" aria-label="打开菜单" aria-controls="sidebar" aria-expanded="false" style="min-width:44px;min-height:44px;">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
     </button>
+    <span class="mobile-brand">{{ APP_NAME }}</span><a href="/user/notifications">通知</a></header>
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
 
     <!-- 主内容区域（有侧边栏） -->
-    <main class="md:ml-64 min-h-screen">
-        <div class="p-4 md:p-8 pt-16 md:pt-8">
+    <main id="main-content" tabindex="-1" class="md:ml-64 min-h-screen">
+        <div class="page-content">
 
-    <script>
-        var sidebar = document.getElementById('sidebar');
-        var mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        var sidebarOverlay = document.getElementById('sidebar-overlay');
-
-        mobileMenuBtn.addEventListener('click', function() {
-            sidebar.classList.toggle('-translate-x-full');
-            sidebarOverlay.classList.toggle('hidden');
-            document.body.classList.toggle('overflow-hidden');
-        });
-
-        sidebarOverlay.addEventListener('click', function() {
-            sidebar.classList.add('-translate-x-full');
-            sidebarOverlay.classList.add('hidden');
-            document.body.classList.remove('overflow-hidden');
-        });
-
-        window.addEventListener('resize', function() {
-            if (window.innerWidth >= 768) {
-                sidebar.classList.remove('-translate-x-full');
-                sidebarOverlay.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            }
-        });
-
-        // 移动端点击导航链接后自动关闭侧边栏
-        sidebar.querySelectorAll('a[href]').forEach(function(link) {
-            link.addEventListener('click', function() {
-                if (window.innerWidth < 768) {
-                    sidebar.classList.add('-translate-x-full');
-                    sidebarOverlay.classList.add('hidden');
-                    document.body.classList.remove('overflow-hidden');
-                }
-            });
-        });
-    </script>
+    <script src="/static/js/interface.js" defer></script>
 
     {% else %}
     <!-- 未登录：简单顶部导航栏 -->
@@ -323,7 +293,7 @@
     </nav>
 
     <!-- 主内容区域（无侧边栏） -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main id="main-content" tabindex="-1" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div>
     {% endif %}
             {% block content %}{% endblock %}
