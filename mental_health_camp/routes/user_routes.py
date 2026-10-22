@@ -308,7 +308,9 @@ async def history(request: Request, enrollment_id: int, current_user: User = Dep
         day_forms[df.day_number] = df
     records = []
     for s in submissions:
-        df = day_forms.get(s.day_number)
+        from types import SimpleNamespace
+        from services.versions import submission_questions
+        df = SimpleNamespace(questions=submission_questions(db, s))
         decrypted_answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
         record_submission = {
             "id": s.id,

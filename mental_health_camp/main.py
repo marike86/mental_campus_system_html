@@ -100,15 +100,8 @@ def register_routes():
 
 @app.on_event("startup")
 def startup():
-    try:
-        init_db()
-    except Exception as e:
-        logger.error("数据库初始化失败: %s", e)
-        raise
-    try:
-        _migrate_database()
-    except Exception as e:
-        logger.error("数据库迁移失败: %s", e)
+    from migrate import require_current_schema
+    require_current_schema()
     try:
         _create_admin_if_needed()
     except Exception as e:
@@ -124,68 +117,6 @@ def startup():
         raise
     _start_notification_scheduler()
 
-
-def _migrate_database():
-    """添加新字段到现有表"""
-    from sqlalchemy import text
-    db = next(get_db())
-    try:
-        # 检查 submissions 表是否有 review_status 列
-        result = db.execute(text("PRAGMA table_info(submissions)"))
-        columns = [row[1] for row in result]
-        if 'review_status' not in columns:
-            db.execute(text("ALTER TABLE submissions ADD COLUMN review_status VARCHAR DEFAULT 'approved' NOT NULL"))
-            logger.info("已添加 submissions.review_status 列")
-        if 'reviewer_id' not in columns:
-            db.execute(text("ALTER TABLE submissions ADD COLUMN reviewer_id INTEGER"))
-            logger.info("已添加 submissions.reviewer_id 列")
-        if 'review_comment' not in columns:
-            db.execute(text("ALTER TABLE submissions ADD COLUMN review_comment TEXT"))
-            logger.info("已添加 submissions.review_comment 列")
-        if 'reviewed_at' not in columns:
-            db.execute(text("ALTER TABLE submissions ADD COLUMN reviewed_at DATETIME"))
-            logger.info("已添加 submissions.reviewed_at 列")
-        # 检查 enrollments 表是否有 status 列
-        result2 = db.execute(text("PRAGMA table_info(enrollments)"))
-        columns2 = [row[1] for row in result2]
-        if 'status' not in columns2:
-            db.execute(text("ALTER TABLE enrollments ADD COLUMN status VARCHAR DEFAULT 'approved' NOT NULL"))
-            logger.info("已添加 enrollments.status 列")
-        # 检查 users 表是否有审核员相关字段
-        result3 = db.execute(text("PRAGMA table_info(users)"))
-        columns3 = [row[1] for row in result3]
-        if 'specialty' not in columns3:
-            db.execute(text("ALTER TABLE users ADD COLUMN specialty VARCHAR"))
-            logger.info("已添加 users.specialty 列")
-        if 'is_active' not in columns3:
-            db.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT 1"))
-            logger.info("已添加 users.is_active 列")
-        if 'max_concurrent_tasks' not in columns3:
-            db.execute(text("ALTER TABLE users ADD COLUMN max_concurrent_tasks INTEGER DEFAULT 10"))
-            logger.info("已添加 users.max_concurrent_tasks 列")
-        # 创建 review_assignments 表（如果不存在）
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS review_assignments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                submission_id INTEGER NOT NULL,
-                reviewer_id INTEGER NOT NULL,
-                assigned_by INTEGER,
-                assignment_type VARCHAR DEFAULT 'auto' NOT NULL,
-                status VARCHAR DEFAULT 'pending' NOT NULL,
-                assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME,
-                FOREIGN KEY (submission_id) REFERENCES submissions(id),
-                FOREIGN KEY (reviewer_id) REFERENCES users(id),
-                FOREIGN KEY (assigned_by) REFERENCES users(id)
-            )
-        """))
-        logger.info("已创建 review_assignments 表")
-        db.commit()
-    except Exception as e:
-        logger.warning("数据库迁移检查: %s", e)
-        db.rollback()
-    finally:
-        db.close()
 
 def _create_admin_if_needed():
     from models.user import User

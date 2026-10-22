@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if day %}第{{ day }}天表单 - {% elif bootcamp %}{{ bootcamp.name }} - {% else %}创建训练营 - {% endif %}{{ APP_NAME }}{% endblock %}
 {% block content %}
+{% if bootcamp and day %}<div class="mb-4 flex flex-wrap gap-4"><a class="text-brand-800" href="/admin/bootcamp/{{bootcamp.id}}/day/{{day}}/preview">预览已保存草稿</a><a class="text-brand-800" href="/admin/bootcamp/{{bootcamp.id}}/day/{{day}}/versions">发布与版本历史</a><span class="text-gray-500">保存草稿后再预览、发布</span></div>{% endif %}
 <div class="space-y-6 fade-in">
 
     {% if bootcamp is none and day is none %}
@@ -159,7 +160,7 @@
                             </button>
                         </div>
                     </div>
-                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors min-h-[44px]">保存题目</button>
+                    <button type="submit" class="bg-brand-800 hover:bg-brand-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors min-h-[44px]">保存草稿</button>
                 </div>
             </form>
         </div>
