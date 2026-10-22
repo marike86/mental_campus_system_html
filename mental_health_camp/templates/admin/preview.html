@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block content %}<h1 class="text-2xl font-bold">第 {{form.day_number}} 天 · 草稿预览</h1><p class="my-4">预览不会创建学习记录或发布内容。</p>
+{% for q in form.questions %}<section class="p-4 bg-white rounded-xl mb-4"><h2 class="font-bold">{{q.label}} {% if q.required %}*{% endif %}</h2>
+{% if q.type == 'reading' %}<div class="whitespace-pre-wrap mt-2">{{q.get('content', '')}}</div>{% elif q.type == 'text' %}<textarea disabled class="border w-full mt-2" placeholder="文本回答"></textarea>{% elif q.type == 'likert' %}<p class="mt-2">{{q.get('min',1)}} — {{q.get('max',5)}} · {{q.get('labels',[])|join(' / ')}}</p>{% else %}{% for option in q.get('options',[]) %}<p class="mt-2">○ {{option}}</p>{% endfor %}{% endif %}</section>{% endfor %}
+<a class="text-brand-800" href="/admin/bootcamp/{{form.bootcamp_id}}/day/{{form.day_number}}">返回编辑草稿</a>{% endblock %}

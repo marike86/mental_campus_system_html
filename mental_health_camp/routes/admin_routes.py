@@ -126,7 +126,9 @@ async def save_day_form(request: Request, bootcamp_id: int, day: int, admin: Use
     try:
         questions = json.loads(questions_str)
     except json.JSONDecodeError:
-        questions = []
+        raise HTTPException(400, "题目 JSON 格式错误")
+    if not isinstance(questions, list):
+        raise HTTPException(400, "题目必须为列表")
     day_form.questions = questions
     db.commit()
     return RedirectResponse(f"/admin/bootcamp/{bootcamp_id}", status_code=302)
@@ -233,34 +235,26 @@ async def export_csv(request: Request, admin: User = Depends(require_admin), db:
         output = io.StringIO()
         output.write('\ufeff')
         writer = csv.writer(output)
-        writer.writerow(["用户昵称", "日期", "天数", "题目", "答案"])
+        writer.writerow(["用户昵称", "日期", "天数", "题目", "答案", "版本号", "提交轮次", "实际提交时间", "审核状态"])
         for e in enrollments:
             user = db.query(User).filter(User.id == e.user_id).first()
             if not user:
                 continue
             submissions = db.query(Submission).filter(Submission.enrollment_id == e.id).order_by(Submission.day_number).all()
+            from models.workflow import SubmissionAttempt, DayFormVersion
             for s in submissions:
-                df = day_forms.get(s.day_number)
-                if not df:
-                    continue
-                try:
-                    answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
-                except Exception:
-                    logger.warning("解密答案数据失败 (submission_id=%d)", s.id)
-                    answers = {}
-                for q in (df.questions or []):
-                    qid = q["id"]
-                    answer = answers.get(qid, "")
-                    if isinstance(answer, list):
-                        answer = ", ".join(answer)
-                    elif q["type"] == "likert" and isinstance(answer, int):
-                        labels = q.get("labels", [])
-                        if 1 <= answer <= len(labels):
-                            answer = f"{answer} - {labels[answer - 1]}"
-                        else:
-                            answer = str(answer)
-                    submit_date = e.start_date + timedelta(days=s.day_number - 1) if e.start_date else ""
-                    writer.writerow([user.nickname, str(submit_date), s.day_number, q.get("label", ""), answer])
+                attempts = db.query(SubmissionAttempt).filter_by(submission_id=s.id).order_by(SubmissionAttempt.round_number).all()
+                for attempt in attempts:
+                    version = db.get(DayFormVersion, attempt.version_id)
+                    answers = decrypt_data(attempt.answers)
+                    for q in version.questions:
+                        answer = answers.get(q["id"], "")
+                        if isinstance(answer, list):
+                            answer = ", ".join(answer)
+                        submit_date = e.start_date + timedelta(days=s.day_number-1) if e.start_date else ""
+                        cells = [user.nickname, str(submit_date), s.day_number, q.get("label", ""), answer,
+                                 version.version, attempt.round_number, attempt.submitted_at.isoformat(), attempt.review_status]
+                        writer.writerow([("'"+str(c)) if str(c).startswith(("=", "+", "-", "@")) else c for c in cells])
         output.seek(0)
         safe_name = re.sub(r'[^\w\u4e00-\u9fff-]', '_', bootcamp.name)
         filename = f"{safe_name}_export.csv"

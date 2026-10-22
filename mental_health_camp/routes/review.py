@@ -76,7 +76,8 @@ async def review_detail(request: Request, submission_id: int, reviewer: User = D
         # 构建题目和答案对照
         questions_with_answers = []
         if day_form and day_form.questions:
-            for q in day_form.questions:
+            from services.versions import submission_questions
+            for q in submission_questions(db, submission):
                 answer = decrypted_answers.get(q["id"], "")
                 questions_with_answers.append({
                     "question": q,

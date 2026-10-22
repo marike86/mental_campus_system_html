@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block content %}
+<h1 class="text-2xl font-bold mb-4">第 {{ form.day_number }} 天 · 发布版本</h1>
+<p class="mb-4 text-gray-600">已开始学习的学员继续使用原版本。历史导入版本只保留迁移时的题目。</p>
+<a class="text-brand-800" href="/admin/bootcamp/{{form.bootcamp_id}}/day/{{form.day_number}}">返回编辑草稿</a>
+<form method="post" action="/admin/bootcamp/{{form.bootcamp_id}}/day/{{form.day_number}}/publish" class="my-4"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}"><button class="bg-brand-800 text-white rounded px-4 py-2">发布当前草稿</button></form>
+{% for version in versions %}<section class="bg-white p-4 rounded-xl mb-4"><h2 class="font-bold">版本 {{version.version}} {% if version.legacy %}· 历史导入版本{% endif %}</h2><p>{{version.published_at}}</p>
+{% for q in version.questions %}<p class="mt-2">{{q.label}} · {{q.type}}</p>{% endfor %}
+<form method="post" action="/admin/bootcamp/{{form.bootcamp_id}}/day/{{form.day_number}}/restore/{{version.id}}" class="mt-3"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}"><button class="text-brand-800">复制为草稿，再预览发布</button></form></section>{% else %}<p>尚未发布版本。</p>{% endfor %}
+{% endblock %}
