@@ -22,6 +22,8 @@ from auth import require_admin, get_password_hash, verify_csrf
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import decrypt_data
+from services.clock import local_date
+from services.versions import write_lock
 from utils.sanitize import sanitize_text, sanitize_email, validate_password_strength
 from routes.audit import log_admin_action
 
@@ -94,6 +96,21 @@ async def update_bootcamp(request: Request, bootcamp_id: int, admin: User = Depe
     new_name = form_data.get("name", "").strip()
     if not new_name:
         raise HTTPException(status_code=400, detail="训练营名称不能为空")
+    requested_days = form_data.get('days')
+    if requested_days:
+        try:
+            days = int(requested_days)
+        except ValueError:
+            raise HTTPException(400, "天数必须为整数")
+        if not 1 <= days <= 365:
+            raise HTTPException(400, "天数必须在 1-365 之间")
+        from models.workflow import EnrollmentDay
+        started = db.query(EnrollmentDay).join(Enrollment, Enrollment.id==EnrollmentDay.enrollment_id).filter(Enrollment.bootcamp_id==bootcamp.id).first()
+        if days < bootcamp.days and started:
+            raise HTTPException(409, "已有学员开始学习，不能缩短训练营")
+        for day in range(bootcamp.days+1, days+1):
+            db.add(DayForm(bootcamp_id=bootcamp.id, day_number=day, questions=[]))
+        bootcamp.days = days
     bootcamp.name = new_name
     bootcamp.description = form_data.get("description", bootcamp.description).strip()
     db.commit()
@@ -185,7 +202,7 @@ async def enroll_user(request: Request, admin: User = Depends(require_admin), db
         enrollment = Enrollment(
             user_id=user_id,
             bootcamp_id=bootcamp_id,
-            start_date=date.today(),
+            start_date=enrollment_start(db, bootcamp_id, int(batch_id) if batch_id and batch_id.isdigit() else None),
             batch_id=int(batch_id) if batch_id and batch_id.isdigit() else None
         )
         db.add(enrollment)
@@ -483,7 +500,7 @@ async def batch_enroll_users(request: Request, admin: User = Depends(require_adm
             enrollment = Enrollment(
                 user_id=uid,
                 bootcamp_id=bootcamp_id,
-                start_date=date.today(),
+                start_date=enrollment_start(db, bootcamp_id, batch_id),
                 batch_id=batch_id,
             )
             db.add(enrollment)
@@ -634,7 +651,7 @@ async def approve_enrollment(enrollment_id: int, admin: User = Depends(require_a
         if not enrollment:
             raise HTTPException(status_code=404, detail="申请不存在")
         enrollment.status = "approved"
-        enrollment.start_date = date.today()
+        enrollment.start_date = enrollment.start_date or enrollment_start(db, enrollment.bootcamp_id, enrollment.batch_id)
         db.commit()
         log_admin_action(db, admin.id, "审批通过加入申请", "enrollment", enrollment_id)
         return RedirectResponse("/admin/users", status_code=302)
@@ -818,3 +835,12 @@ async def admin_batch_delete_batches(request: Request, admin: User = Depends(req
     except Exception as e:
         logger.exception("批量删除批次失败 (admin_id=%d): %s", admin.id, e)
         raise HTTPException(status_code=500, detail="批量删除批次时发生错误")
+
+
+def enrollment_start(db, camp_id, batch_id):
+    if batch_id:
+        batch = db.query(Batch).filter_by(id=batch_id, bootcamp_id=camp_id).first()
+        if not batch:
+            raise HTTPException(400, "批次不属于此训练营")
+        return batch.start_date or local_date()
+    return local_date()

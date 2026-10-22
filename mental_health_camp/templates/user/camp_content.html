@@ -22,6 +22,7 @@
             <p class="text-gray-500 mt-1">第 {{ day_number }} 天</p>
         </div>
 
+        {% if existing and existing.review_comment %}<p class="bg-red-50 p-4 mb-4">审核批注：{{existing.review_comment}}</p>{% endif %}
         <div id="camp-content-container">
             <div class="text-center py-8">
                 <div class="animate-spin w-8 h-8 border-4 border-brand-800 border-t-transparent rounded-full mx-auto mb-3"></div>
@@ -31,6 +32,7 @@
     </div>
 </div>
 
+<script src="/static/js/draft.js"></script>
 <script src="/static/js/camp_content.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -38,6 +40,9 @@
             questions: {{ questions_json | tojson }},
             enrollmentId: {{ enrollment.id }},
             dayNumber: {{ day_number }},
+            versionId: {{ version_id }},
+            draftKey: {{ draft_key | tojson }},
+            initialAnswers: {{ (existing.answers if existing else {}) | tojson }},
             csrfToken: {{ csrf_token(request) | tojson }},
             formAction: '/user/form/{{ enrollment.id }}/{{ day_number }}'
         });

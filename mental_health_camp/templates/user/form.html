@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}第 {{ day_number }} 天 - {{ bootcamp.name }} - {{ APP_NAME }}{% endblock %}
 {% block content %}
+{% if state.reason %}<p class="bg-amber-50 p-4 mb-4">{{state.reason}}</p>{% endif %}
+<p class="mb-3 text-gray-500">课程版本 {{version.version}}{% if version.legacy %} · 历史导入版本{% endif %}</p>
 <div class="fade-in max-w-2xl mx-auto">
     <div class="mb-6">
         <a href="/user/today" class="inline-flex items-center min-h-[44px] py-1 text-sm text-gray-500 hover:text-brand-800 transition-colors">
@@ -33,7 +35,7 @@
         </div>
         {% endif %}
 
-        {% if existing and existing.review_status != 'rejected' %}
+        {% if existing and (existing.review_status != 'rejected' or not can_edit) %}
         <div class="mb-6">
             {% if existing.review_status == 'approved' %}
             <div class="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -113,8 +115,8 @@
             </div>
         </div>
         {% endif %}
-        <form id="form-{{ enrollment.id }}" method="POST" action="/user/form/{{ enrollment.id }}/{{ day_number }}" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+        <form data-draft-key="{{draft_key}}" id="form-{{ enrollment.id }}" method="POST" action="/user/form/{{ enrollment.id }}/{{ day_number }}" class="space-y-6">
+            <input type="hidden" name="version_id" value="{{version_id}}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
             {% for q in day_form.questions %}
             <div data-question-id="{{ q.id }}" class="border border-gray-200 rounded-xl p-5 hover:border-brand-200 transition-colors">
                 <label class="block text-sm font-medium text-gray-700 mb-3">
@@ -179,7 +181,7 @@
     </div>
 </div>
 
-{% if not existing %}
+{% if can_edit %}
 <script src="/static/js/draft.js"></script>
 <script src="/static/js/logic.js"></script>
 <script>

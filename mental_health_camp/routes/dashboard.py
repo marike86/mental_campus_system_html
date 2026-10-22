@@ -11,6 +11,10 @@ from models.submission import Submission
 from models.day_form import DayForm
 from auth import get_current_user
 from utils.crypto import decrypt_data
+from services import courses
+from services.versions import submission_questions
+from services.clock import local_date
+from types import SimpleNamespace
 
 router = APIRouter(prefix="/user/api", tags=["dashboard-api"])
 
@@ -25,54 +29,37 @@ async def dashboard_data(enrollment_id: int, current_user: User = Depends(get_cu
     bootcamp = db.query(Bootcamp).filter(Bootcamp.id == enrollment.bootcamp_id).first()
     if not bootcamp:
         return JSONResponse({"error": "训练营不存在"}, status_code=404)
-    today = date.today()
-    today_number = (today - enrollment.start_date).days + 1
+    today = local_date()
+    today_number = (today - enrollment.start_date).days + 1 if enrollment.start_date else 0
     submissions = db.query(Submission).filter(
         Submission.enrollment_id == enrollment_id
     ).all()
-    submitted_days = {s.day_number for s in submissions}
-    calendar = []
-    for d in range(1, bootcamp.days + 1):
-        day_date = enrollment.start_date + timedelta(days=d - 1)
-        status = "future"
-        if d <= today_number:
-            if d in submitted_days:
-                status = "completed"
-            else:
-                status = "missed"
-        calendar.append({"day": d, "date": day_date.isoformat(), "status": status})
-    streak = 0
-    check_date = today
-    for _ in range(bootcamp.days):
-        d = (check_date - enrollment.start_date).days + 1
-        if d < 1:
-            break
-        if d in submitted_days:
-            streak += 1
-            check_date -= timedelta(days=1)
-        else:
-            break
+    _, items = courses.progress(db, enrollment)
+    submitted_days = {s.day_number for s in submissions if s.review_status=='approved'}
+    calendar = [dict(day=x['day'], date=x['scheduled_date'], status=x['status'], reason=x['reason']) for x in items]
+    streak = courses.streak(submissions)
     day_forms = {}
     for df in db.query(DayForm).filter(DayForm.bootcamp_id == bootcamp.id).all():
         day_forms[df.day_number] = df
     likert_series = {}
     for s in sorted(submissions, key=lambda x: x.day_number):
-        df = day_forms.get(s.day_number)
+        df = SimpleNamespace(questions=submission_questions(db, s))
         if not df:
             continue
         answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
         for q in df.questions:
             if q["type"] == "likert":
                 qid = q["id"]
+                series_key = f"{s.current_attempt_id and db.get(__import__('models.workflow',fromlist=['SubmissionAttempt']).SubmissionAttempt, s.current_attempt_id).version_id}:{qid}"
                 val = answers.get(qid)
                 if val is not None:
-                    if qid not in likert_series:
-                        likert_series[qid] = {
+                    if series_key not in likert_series:
+                        likert_series[series_key] = {
                             "label": q["label"],
                             "labels": q.get("labels", []),
                             "data": []
                         }
-                    likert_series[qid]["data"].append({
+                    likert_series[series_key]["data"].append({
                         "day": s.day_number,
                         "value": val
                     })
@@ -102,7 +89,7 @@ async def likert_trend(enrollment_id: int, question_id: str, current_user: User 
     labels = []
     values = []
     for s in submissions:
-        df = day_forms.get(s.day_number)
+        df = SimpleNamespace(questions=submission_questions(db, s))
         if not df:
             continue
         answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers

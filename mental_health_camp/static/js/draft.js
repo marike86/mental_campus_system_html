@@ -1,59 +1,36 @@
-function getDraftKey(formId) {
-    return 'draft_' + formId;
+function readAnswerDraft(key) {
+    try {
+        const value = JSON.parse(localStorage.getItem(key));
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    } catch (_) { return null; }
 }
-
+function writeAnswerDraft(key, answers) {
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(answers)); } catch (_) {}
+}
 function saveDraft(formId) {
-    var form = document.getElementById('form-' + formId);
+    const form = document.getElementById('form-' + formId);
     if (!form) return;
-    var data = {};
-    var inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(function(el) {
+    const answers = {};
+    form.querySelectorAll('[name^="q_"]').forEach(el => {
+        const id = el.name.slice(2);
         if (el.type === 'checkbox') {
-            if (!data[el.name]) data[el.name] = [];
-            if (el.checked) data[el.name].push(el.value);
-        } else if (el.type === 'radio') {
-            if (el.checked) data[el.name] = el.value;
-        } else {
-            data[el.name] = el.value;
-        }
+            answers[id] ??= [];
+            if (el.checked) answers[id].push(el.value);
+        } else if (el.type !== 'radio' || el.checked) answers[id] = el.value;
     });
-    localStorage.setItem(getDraftKey(formId), JSON.stringify(data));
+    writeAnswerDraft(form.dataset.draftKey, answers);
 }
-
-function restoreDraft(formId) {
-    var raw = localStorage.getItem(getDraftKey(formId));
-    if (!raw) return;
-    var data;
-    try { data = JSON.parse(raw); } catch(e) { return; }
-    var form = document.getElementById('form-' + formId);
-    if (!form) return;
-    Object.keys(data).forEach(function(name) {
-        var value = data[name];
-        var el = form.querySelector('[name="' + name + '"]');
-        if (!el) return;
-        if (el.type === 'checkbox') {
-            var group = form.querySelectorAll('[name="' + name + '"]');
-            group.forEach(function(cb) {
-                cb.checked = Array.isArray(value) && value.includes(cb.value);
-            });
-        } else if (el.type === 'radio') {
-            var radio = form.querySelector('[name="' + name + '"][value="' + value + '"]');
-            if (radio) radio.checked = true;
-        } else {
-            el.value = value;
-        }
-    });
-}
-
-function clearDraft(formId) {
-    localStorage.removeItem(getDraftKey(formId));
-}
-
 function initFormDraft(formId) {
-    restoreDraft(formId);
-    var form = document.getElementById('form-' + formId);
+    const form = document.getElementById('form-' + formId);
     if (!form) return;
-    form.addEventListener('submit', function() {
-        clearDraft(formId);
+    const answers = readAnswerDraft(form.dataset.draftKey);
+    if (!answers) return;
+    form.querySelectorAll('[name^="q_"]').forEach(el => {
+        const value = answers[el.name.slice(2)];
+        if (value === undefined) return;
+        if (el.type === 'checkbox') el.checked = Array.isArray(value) && value.includes(el.value);
+        else if (el.type === 'radio') el.checked = String(value) === el.value;
+        else el.value = value;
     });
 }
