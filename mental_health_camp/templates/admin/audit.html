@@ -7,7 +7,7 @@
         <p class="text-gray-500 mt-1">管理员操作记录（共 {{ total }} 条）</p>
     </div>
 
-    <form method="get" class="flex flex-wrap gap-2">{% for key,label in [('admin_id','操作者ID'),('event_type','事件类型'),('target_type','目标类型'),('target_id','目标ID'),('camp_id','训练营ID'),('batch_id','批次ID'),('operation_id','批量操作编号'),('start','开始日期'),('end','结束日期')] %}<label>{{label}} <input class="border rounded p-2 max-w-full" name="{{key}}" value="{{request.query_params.get(key,'')}}" {% if key in ['start','end'] %}type="date"{% endif %}></label>{% endfor %}<button>筛选</button></form>
+    <form method="get" class="filter-panel">{% for key,label in [('admin_id','操作者ID'),('event_type','事件类型'),('target_type','目标类型'),('target_id','目标ID'),('camp_id','训练营ID'),('batch_id','批次ID'),('operation_id','批量操作编号'),('start','开始日期'),('end','结束日期')] %}<label>{{label}} <input class="border rounded p-2 max-w-full" name="{{key}}" value="{{request.query_params.get(key,'')}}" {% if key in ['start','end'] %}type="date"{% endif %}></label>{% endfor %}<button>筛选</button></form>
     {% if logs %}
     <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
         <div class="hidden md:block overflow-x-auto">

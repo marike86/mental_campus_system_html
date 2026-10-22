@@ -1,0 +1,11 @@
+(() => {
+const sidebar=document.getElementById('sidebar'),button=document.getElementById('mobile-menu-btn'),overlay=document.getElementById('sidebar-overlay');if(!sidebar)return;
+document.querySelectorAll('.data-disclosure').forEach(el=>el.open=innerWidth>=768);
+const close=document.getElementById('mobile-close'),mobile=matchMedia('(max-width:767px)');let opened=false;
+function render(restore=false){const drawer=mobile.matches;sidebar.classList.toggle('-translate-x-full',drawer&&!opened);sidebar.inert=drawer&&!opened;overlay.classList.toggle('hidden',!drawer||!opened);button.setAttribute('aria-expanded',String(drawer&&opened));button.setAttribute('aria-label',opened?'关闭菜单':'打开菜单');document.body.classList.toggle('overflow-hidden',drawer&&opened);if(drawer&&opened){sidebar.setAttribute('role','dialog');sidebar.setAttribute('aria-modal','true');sidebar.setAttribute('aria-label','主导航');}else{sidebar.removeAttribute('role');sidebar.removeAttribute('aria-modal');}if(restore)button.focus();}
+function dismiss(){opened=false;render(true);}
+button.addEventListener('click',()=>{opened=!opened;render();if(opened)close.focus();});close.addEventListener('click',dismiss);overlay.addEventListener('click',dismiss);
+sidebar.addEventListener('keydown',e=>{if(!mobile.matches||!opened)return;if(e.key==='Escape'){e.preventDefault();dismiss();}if(e.key==='Tab'){const items=[...sidebar.querySelectorAll('a[href],button')].filter(x=>x.getClientRects().length);const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+sidebar.querySelectorAll('nav a[href]').forEach(link=>{const url=new URL(link.href);if(url.pathname===location.pathname&&(!url.search||url.search===location.search))link.setAttribute('aria-current','page');link.addEventListener('click',()=>{if(mobile.matches){opened=false;render();}});});
+mobile.addEventListener('change',()=>{opened=false;render();});render();
+})();

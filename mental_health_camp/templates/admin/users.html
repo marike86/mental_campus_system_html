@@ -390,7 +390,8 @@ var bootcampBatches = {{ bootcamp_batches | tojson }};
 
 function updateBatchSelect(bootcampSelect) {
     var form = bootcampSelect.closest('form');
-    var batchSelect = form.querySelector('.batch-select');
+    var batchSelect = form && form.querySelector('.batch-select, .batch-select-modal');
+    if (!batchSelect) return;
     var bootcampId = bootcampSelect.value;
     var batches = bootcampBatches[bootcampId] || [];
 
@@ -405,6 +406,7 @@ function updateBatchSelect(bootcampSelect) {
 
 function updateBatchModalSelect(bootcampSelect) {
     var batchSelect = document.querySelector('.batch-select-modal');
+    if (!batchSelect) return;
     var bootcampId = bootcampSelect.value;
     var batches = bootcampBatches[bootcampId] || [];
 
