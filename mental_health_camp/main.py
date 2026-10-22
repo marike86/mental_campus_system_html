@@ -72,6 +72,25 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
 
 
+from sqlalchemy.exc import OperationalError, IntegrityError
+
+
+@app.exception_handler(OperationalError)
+async def database_busy(request: Request, exc: OperationalError):
+    if 'locked' in str(exc).lower():
+        return JSONResponse(status_code=409, content={"detail":"操作正在处理中，请稍后重试"})
+    logger.exception("数据库操作失败", exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail":"服务器内部错误，请稍后重试"})
+
+
+@app.exception_handler(IntegrityError)
+async def concurrent_change(request: Request, exc: IntegrityError):
+    if 'unique' in str(exc).lower():
+        return JSONResponse(status_code=409, content={"detail":"数据已更新，请刷新页面"})
+    logger.exception("数据库约束错误", exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail":"服务器内部错误，请稍后重试"})
+
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.exception("未处理的异常 [%s %s]: %s", request.method, request.url.path, exc)

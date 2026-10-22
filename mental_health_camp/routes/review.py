@@ -21,8 +21,12 @@ router = APIRouter(tags=["review"])
 
 @router.get("/review/pending")
 @router.get("/admin/assignments")
-async def workbench(request: Request, view: str='public', camp: int=None, batch: int=None, overdue: bool=False, page: int=1,
+async def workbench(request: Request, view: str='public', camp: str='', batch: str='', overdue: bool=False, page: int=1,
                     reviewer=Depends(require_reviewer), db: Session=Depends(get_db)):
+    try:
+        camp, batch = (int(camp) if camp else None), (int(batch) if batch else None)
+    except ValueError:
+        raise HTTPException(400, '筛选参数无效')
     if view not in ('public','mine','completed','all') or page<1:
         raise HTTPException(400, "筛选参数无效")
     admin = reviewer.role in ('admin','super_admin')

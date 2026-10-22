@@ -8,6 +8,8 @@ import tests as helpers
 from auth import verify_csrf
 from main import app
 from models.submission import Submission
+from models.workflow import SubmissionAttempt
+from services.versions import bound_version
 from models.review_assignment import ReviewAssignment
 from utils.crypto import decrypt_data
 
@@ -74,13 +76,13 @@ def test_json_answer_verification_accepts_matching_header(enrollment, real_clien
     assert response.json()["correct"] is True
 
 
-@pytest.mark.parametrize("answer,status", [("bad", 400), ("6", 400), ("0", 302)])
+@pytest.mark.parametrize("answer,status", [("bad", 400), ("6", 400), ("0", 303)])
 def test_likert_validation(enrollment, answer, status):
     db, _, enrolled = enrollment
     response = helpers.client.post(f"/user/form/{enrolled.id}/1",
-                                   data={"q_q1": "回答", "q_scale": answer}, follow_redirects=False)
+                                   data={"version_id": bound_version(db,enrolled.id,1).id,"q_q1": "回答", "q_scale": answer}, follow_redirects=False)
     assert response.status_code == status
-    assert db.query(Submission).count() == (1 if status == 302 else 0)
+    assert db.query(Submission).count() == (1 if status == 303 else 0)
 
 
 def test_nonexistent_form_cannot_create_submission(enrollment):
@@ -96,8 +98,8 @@ def test_failed_resubmission_keeps_rejected_answers(enrollment):
     old.review_status = "rejected"
     old.review_comment = "请补充"
     db.commit()
-    response = helpers.client.post(f"/user/form/{enrolled.id}/1", data={"q_scale": "2"})
-    assert response.status_code == 200
+    response = helpers.client.post(f"/user/form/{enrolled.id}/1", data={"version_id": bound_version(db,enrolled.id,1).id,"q_scale": "2"})
+    assert response.status_code == 400
     db.expire_all()
     saved = db.get(Submission, old.id)
     assert saved.review_status == "rejected"
@@ -116,8 +118,8 @@ def test_valid_resubmission_preserves_id_and_clears_review(enrollment):
     db.commit()
     old_id = old.id
     response = helpers.client.post(f"/user/form/{enrolled.id}/1",
-                                   data={"q_q1": "新答案", "q_scale": "2"}, follow_redirects=False)
-    assert response.status_code == 302
+                                   data={"version_id": bound_version(db,enrolled.id,1).id,"q_q1": "新答案", "q_scale": "2"}, follow_redirects=False)
+    assert response.status_code == 303
     db.expire_all()
     saved = db.get(Submission, old_id)
     assert db.query(Submission).count() == 1
@@ -133,6 +135,9 @@ def test_history_displays_review_status_and_comment(enrollment, status, label):
     submission = helpers._create_submission(db, enrolled.id, 1, {"q1": "回答"})
     submission.review_status = status
     submission.review_comment = "请补充说明"
+    attempt=db.get(SubmissionAttempt,submission.current_attempt_id)
+    attempt.review_status=status
+    attempt.review_comment=submission.review_comment
     db.commit()
     response = helpers.client.get(f"/user/history/{enrolled.id}")
     assert response.status_code == 200

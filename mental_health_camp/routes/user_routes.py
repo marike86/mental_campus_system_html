@@ -116,9 +116,22 @@ async def fill_form(request: Request, enrollment_id: int, day: int, current_user
 async def submit_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
     form = await request.form()
-    courses.submit(db, enrollment, day, form)
+    try:
+        submission = courses.submit(db, enrollment, day, form)
+    except HTTPException as exc:
+        if exc.status_code != 400:
+            raise
+        db.rollback()
+        context = form_context(db, enrollment, day, current_user, request)
+        answers = {}
+        for q in context['version'].questions:
+            key='q_'+q['id']
+            answers[q['id']] = form.getlist(key) if q['type']=='multiple' else form.get(key,'')
+        context.update(existing=SimpleNamespace(answers=answers,review_status='rejected',review_comment=''),can_edit=True,error=exc.detail)
+        reading=any(q['type']=='reading' for q in context['version'].questions)
+        return templates.TemplateResponse('user/camp_content.html' if reading else 'user/form.html',context,status_code=400)
     db.commit()
-    return RedirectResponse(f"/user/history/{enrollment_id}?submitted_day={day}", 303)
+    return RedirectResponse(f"/user/history/{enrollment_id}?submitted_day={day}&submitted_attempt={submission.current_attempt_id}", 303)
 
 
 @router.post("/api/verify-answer")
@@ -140,7 +153,7 @@ async def verify_answer(request: Request, current_user: User=Depends(get_current
     correct = question.get('correct')
     is_correct = True
     if correct is not None:
-        is_correct = (isinstance(answer,list) and set(answer)==set(correct)) if question['type']=='multiple' else answer==correct
+        is_correct = (isinstance(answer,list) and all(isinstance(x,str) for x in answer) and set(answer)==set(correct)) if question['type']=='multiple' else answer==correct
     return dict(correct=is_correct, message="回答正确！" if is_correct else "回答有误，请再试一次")
 
 
@@ -227,7 +240,9 @@ async def history(request: Request, enrollment_id: int, current_user: User = Dep
             records.append(dict(submission=record, day_form=SimpleNamespace(questions=version.questions)))
     clear_key = None
     submitted_day = request.query_params.get('submitted_day', '')
-    if submitted_day.isdigit():
+    submitted_attempt=request.query_params.get('submitted_attempt','')
+    accepted=next((s for s in submissions if str(s.current_attempt_id)==submitted_attempt and s.review_status!='rejected'),None)
+    if submitted_day.isdigit() and accepted and accepted.day_number==int(submitted_day):
         version = bound_version(db, enrollment.id, int(submitted_day))
         if version and any(s.day_number==int(submitted_day) for s in submissions):
             clear_key = f"answers:{current_user.id}:{enrollment.id}:{int(submitted_day)}:{version.id}"

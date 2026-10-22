@@ -9,7 +9,7 @@ from models import user, bootcamp, day_form, enrollment, submission, batch, badg
 from models.workflow import WorkflowSchema, DayFormVersion, EnrollmentDay, SubmissionAttempt
 from services.clock import now
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def preflight(connection):
@@ -38,7 +38,7 @@ def migrate(backup_path=None):
             installed = connection.execute(text("SELECT version FROM workflow_schema WHERE id=1")).scalar()
             if installed == SCHEMA_VERSION:
                 return False
-            if installed is not None:
+            if installed not in (None, 1):
                 raise RuntimeError("不支持的数据库版本")
     if tables and engine.url.database not in (None, ":memory:"):
         destination = Path(backup_path or (str(engine.url.database) + now().strftime('.%Y%m%d%H%M%S.backup')))
@@ -105,6 +105,14 @@ def migrate(backup_path=None):
         db.commit()
     with engine.begin() as connection:
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_active_attempt_assignment ON review_assignments(attempt_id) WHERE status='pending'"))
+        connection.execute(text("""CREATE TRIGGER IF NOT EXISTS immutable_published_questions
+            BEFORE UPDATE OF questions, version, day_form_id ON day_form_versions
+            BEGIN SELECT RAISE(ABORT, 'Published content is immutable'); END"""))
+        connection.execute(text("""CREATE TRIGGER IF NOT EXISTS protect_used_version
+            BEFORE DELETE ON day_form_versions
+            WHEN EXISTS(SELECT 1 FROM enrollment_days WHERE version_id=OLD.id)
+              OR EXISTS(SELECT 1 FROM submission_attempts WHERE version_id=OLD.id)
+            BEGIN SELECT RAISE(ABORT, 'Version is in use'); END"""))
     return True
 
 

@@ -15,6 +15,7 @@ from services import courses
 from services.versions import submission_questions
 from services.clock import local_date
 from types import SimpleNamespace
+from models.workflow import SubmissionAttempt, DayFormVersion
 
 router = APIRouter(prefix="/user/api", tags=["dashboard-api"])
 
@@ -50,13 +51,15 @@ async def dashboard_data(enrollment_id: int, current_user: User = Depends(get_cu
         for q in df.questions:
             if q["type"] == "likert":
                 qid = q["id"]
-                series_key = f"{s.current_attempt_id and db.get(__import__('models.workflow',fromlist=['SubmissionAttempt']).SubmissionAttempt, s.current_attempt_id).version_id}:{qid}"
+                series_key = f"{s.current_attempt_id and db.get(SubmissionAttempt, s.current_attempt_id).version_id}:{qid}"
                 val = answers.get(qid)
                 if val is not None:
                     if series_key not in likert_series:
                         likert_series[series_key] = {
                             "label": q["label"],
                             "labels": q.get("labels", []),
+                            "min": q.get("min",1),
+                            "version_label": f"第{s.day_number}天 · 版本{db.get(DayFormVersion,db.get(SubmissionAttempt,s.current_attempt_id).version_id).version}" if s.current_attempt_id else "历史记录",
                             "data": []
                         }
                     likert_series[series_key]["data"].append({
@@ -86,18 +89,16 @@ async def likert_trend(enrollment_id: int, question_id: str, current_user: User 
     submissions = db.query(Submission).filter(
         Submission.enrollment_id == enrollment_id
     ).order_by(Submission.day_number).all()
-    labels = []
-    values = []
-    for s in submissions:
-        df = SimpleNamespace(questions=submission_questions(db, s))
-        if not df:
-            continue
-        answers = decrypt_data(s.answers) if isinstance(s.answers, str) else s.answers
-        for q in df.questions:
-            if q["id"] == question_id and q["type"] == "likert":
-                val = answers.get(question_id)
-                if val is not None:
-                    labels.append(f"第{s.day_number}天")
-                    values.append(val)
-                break
-    return JSONResponse({"labels": labels, "values": values})
+    series = {}
+    for sub in submissions:
+        attempt = db.get(SubmissionAttempt,sub.current_attempt_id) if sub.current_attempt_id else None
+        for q in submission_questions(db,sub):
+            if q['id']==question_id and q['type']=='likert':
+                value=decrypt_data(sub.answers).get(question_id)
+                if value is not None:
+                    key=str(attempt.version_id if attempt else 'legacy')
+                    row=series.setdefault(key,dict(version_id=attempt.version_id if attempt else None,label=q.get('label',''),labels=[],values=[]))
+                    row['labels'].append(f'第{sub.day_number}天')
+                    row['values'].append(value)
+    single=next(iter(series.values())) if len(series)==1 else dict(labels=[],values=[])
+    return JSONResponse(dict(labels=single['labels'],values=single['values'],series=series))

@@ -53,6 +53,8 @@ def latest_version(db, day_form_id):
 
 def publish(db, day_form, admin_id):
     write_lock(db)
+    if not db.is_modified(day_form):
+        db.refresh(day_form)
     validate_questions(day_form.questions)
     previous = latest_version(db, day_form.id)
     version = DayFormVersion(day_form_id=day_form.id, version=(previous.version+1 if previous else 1),

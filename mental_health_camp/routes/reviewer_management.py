@@ -7,6 +7,7 @@ from sqlalchemy import func as sql_func
 from database import get_db
 from models.user import User
 from models.submission import Submission
+from models.workflow import SubmissionAttempt
 from models.review_assignment import ReviewAssignment
 from auth import require_admin, require_super_admin, get_password_hash, verify_csrf
 from config import APP_NAME
@@ -30,7 +31,7 @@ async def reviewer_list(request: Request, admin: User = Depends(require_super_ad
         reviewer_stats = []
         for reviewer in reviewers:
             # 总审核数
-            total_reviews = db.query(Submission).filter(Submission.reviewer_id == reviewer.id).count()
+            total_reviews = db.query(SubmissionAttempt).filter(SubmissionAttempt.reviewer_id == reviewer.id).count()
             # 待审核任务数
             pending_tasks = db.query(ReviewAssignment).filter(
                 ReviewAssignment.reviewer_id == reviewer.id,
@@ -42,9 +43,9 @@ async def reviewer_list(request: Request, admin: User = Depends(require_super_ad
                 ReviewAssignment.status == "completed"
             ).count()
             # 通过率
-            approved_count = db.query(Submission).filter(
-                Submission.reviewer_id == reviewer.id,
-                Submission.review_status == "approved"
+            approved_count = db.query(SubmissionAttempt).filter(
+                SubmissionAttempt.reviewer_id == reviewer.id,
+                SubmissionAttempt.review_status == "approved"
             ).count()
             approval_rate = int((approved_count / total_reviews * 100)) if total_reviews > 0 else 0
             
@@ -135,14 +136,14 @@ async def reviewer_detail(request: Request, reviewer_id: int, admin: User = Depe
             raise HTTPException(status_code=404, detail="审核员不存在")
         
         # 获取审核统计
-        total_reviews = db.query(Submission).filter(Submission.reviewer_id == reviewer_id).count()
-        approved_count = db.query(Submission).filter(
-            Submission.reviewer_id == reviewer_id,
-            Submission.review_status == "approved"
+        total_reviews = db.query(SubmissionAttempt).filter(SubmissionAttempt.reviewer_id == reviewer_id).count()
+        approved_count = db.query(SubmissionAttempt).filter(
+            SubmissionAttempt.reviewer_id == reviewer_id,
+            SubmissionAttempt.review_status == "approved"
         ).count()
-        rejected_count = db.query(Submission).filter(
-            Submission.reviewer_id == reviewer_id,
-            Submission.review_status == "rejected"
+        rejected_count = db.query(SubmissionAttempt).filter(
+            SubmissionAttempt.reviewer_id == reviewer_id,
+            SubmissionAttempt.review_status == "rejected"
         ).count()
         approval_rate = int((approved_count / total_reviews * 100)) if total_reviews > 0 else 0
         
@@ -153,10 +154,8 @@ async def reviewer_detail(request: Request, reviewer_id: int, admin: User = Depe
         ).order_by(ReviewAssignment.assigned_at.desc()).all()
         
         # 获取最近审核记录
-        recent_reviews = db.query(Submission).filter(
-            Submission.reviewer_id == reviewer_id
-        ).order_by(Submission.reviewed_at.desc()).limit(20).all()
-        
+        recent_reviews = db.query(SubmissionAttempt).filter(SubmissionAttempt.reviewer_id==reviewer_id).order_by(SubmissionAttempt.reviewed_at.desc()).limit(20).all()
+
         return templates.TemplateResponse("super_admin/reviewer_detail.html", {
             "request": request, "user": admin, "app_name": APP_NAME,
             "reviewer": reviewer,
@@ -291,14 +290,14 @@ async def review_statistics(request: Request, admin: User = Depends(require_supe
         reviewers = db.query(User).filter(User.role == "reviewer").all()
         reviewer_stats = []
         for reviewer in reviewers:
-            reviewed = db.query(Submission).filter(Submission.reviewer_id == reviewer.id).count()
-            approved = db.query(Submission).filter(
-                Submission.reviewer_id == reviewer.id,
-                Submission.review_status == "approved"
+            reviewed = db.query(SubmissionAttempt).filter(SubmissionAttempt.reviewer_id == reviewer.id).count()
+            approved = db.query(SubmissionAttempt).filter(
+                SubmissionAttempt.reviewer_id == reviewer.id,
+                SubmissionAttempt.review_status == "approved"
             ).count()
-            rejected = db.query(Submission).filter(
-                Submission.reviewer_id == reviewer.id,
-                Submission.review_status == "rejected"
+            rejected = db.query(SubmissionAttempt).filter(
+                SubmissionAttempt.reviewer_id == reviewer.id,
+                SubmissionAttempt.review_status == "rejected"
             ).count()
             approval_rate = int((approved / reviewed * 100)) if reviewed > 0 else 0
             

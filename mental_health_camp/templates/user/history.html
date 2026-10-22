@@ -31,20 +31,20 @@
                 <div class="absolute left-3 top-1 w-5 h-5 rounded-full bg-yellow-500 border-4 border-white shadow-sm z-10"></div>
                 {% endif %}
                 <div class="bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-2">
+                    <div class="flex flex-wrap gap-2 items-center justify-between mb-4">
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-brand-100 text-brand-700">
                                 第 {{ record.submission.day_number }} 天 · 第 {{record.submission.round_number}} 次 · 版本 {{record.submission.version}}{% if record.submission.legacy %}（历史导入）{% endif %}
                             </span>
                             {% if record.submission.review_status == 'approved' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">已通过</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full whitespace-nowrap text-xs font-medium bg-green-100 text-green-700">已通过</span>
                             {% elif record.submission.review_status == 'rejected' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">未通过</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full whitespace-nowrap text-xs font-medium bg-red-100 text-red-700">未通过</span>
                             {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">待审核</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full whitespace-nowrap text-xs font-medium bg-yellow-100 text-yellow-700">待审核</span>
                             {% endif %}
                         </div>
-                        <span class="text-sm text-gray-400">{{ record.submission.submitted_at.strftime('%Y-%m-%d %H:%M') if record.submission.submitted_at else '' }}</span>
+                        <span class="text-sm text-gray-400 whitespace-nowrap">{{ record.submission.submitted_at.strftime('%Y-%m-%d %H:%M') if record.submission.submitted_at else '' }}</span>
                     </div>
                     {% if record.submission.review_status == 'rejected' and record.submission.review_comment %}
                     <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -58,19 +58,20 @@
                         <div class="border-l-2 border-gray-100 pl-4">
                             <p class="text-sm font-medium text-gray-500 mb-1">{{ q.label }}</p>
                             {% set answer = record.submission.answers[q.id] if record.submission.answers[q.id] is defined else None %}
-                            {% if q.type == "text" %}
+                            {% if q.type == "reading" %}<p class="text-sm text-gray-800 whitespace-pre-wrap">{{q.get('content','')}}</p>
+                            {% elif q.type == "text" %}
                             <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ answer if answer else '未填写' }}</p>
                             {% elif q.type == "single" %}
                             <p class="text-sm text-gray-800">{{ answer if answer else '未填写' }}</p>
                             {% elif q.type == "multiple" %}
                             <p class="text-sm text-gray-800">{{ answer | join('、') if answer else '未填写' }}</p>
                             {% elif q.type == "likert" %}
-                            {% if answer %}
+                            {% if answer is not none and answer != '' %}
                             {% set likert_labels = q.labels if q.labels is defined else [] %}
-                            <div class="flex items-center space-x-2">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-brand-800 text-white text-sm font-medium">{{ answer }}</span>
-                                {% if likert_labels and likert_labels[answer - 1] %}
-                                <span class="text-sm text-gray-600">{{ likert_labels[answer - 1] }}</span>
+                                {% if likert_labels and likert_labels[answer - q.get('min',1)] %}
+                                <span class="text-sm text-gray-600">{{ likert_labels[answer - q.get('min',1)] }}</span>
                                 {% endif %}
                             </div>
                             {% else %}
@@ -81,7 +82,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-sm text-gray-400">该日数据不可用</p>
+                    <p class="text-sm text-gray-400 whitespace-nowrap">该日数据不可用</p>
                     {% endif %}
                 </div>
             </div>

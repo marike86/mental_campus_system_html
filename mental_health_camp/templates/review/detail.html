@@ -56,14 +56,14 @@
                 </div>
                 {% elif item.question.type == 'likert' %}
                 <div class="flex items-center space-x-2">
-                    {% set score = item.answer|int if item.answer else 0 %}
-                    {% for i in range(1, 6) %}
+                    {% set score = item.answer if item.answer is not none and item.answer != '' else none %}
+                    {% for i in range(item.question.get('min',1), item.question.get('max',5)+1) %}
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium {{ 'bg-brand-100 text-brand-800' if i == score else 'bg-gray-100 text-gray-400' }}">
                         {{ i }}
                     </div>
                     {% endfor %}
-                    {% if item.question.labels and score > 0 and score <= item.question.labels|length %}
-                    <span class="text-sm text-gray-500 ml-2">（{{ item.question.labels[score - 1] }}）</span>
+                    {% if item.question.labels and score is not none and score-item.question.get('min',1) < item.question.labels|length %}
+                    <span class="text-sm text-gray-500 ml-2">（{{ item.question.labels[score - item.question.get('min',1)] }}）</span>
                     {% endif %}
                 </div>
                 {% elif item.question.type == 'multiple' %}
@@ -108,10 +108,10 @@
             </form>
 
             <form method="POST" action="/review/{{ submission.id }}/reject" class="sm:flex-1"><input type="hidden" name="attempt_id" value="{{attempt.id}}"><input type="hidden" name="csrf_token" value="{{csrf_token(request)}}">
-                <input type="hidden" name="attempt_id" value="{{attempt.id}}"><input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">不通过原因（可选）</label>
-                    <textarea name="comment" rows="3" placeholder="请输入不通过的原因，以便用户修改后重新提交..."
+                    <label class="block text-sm font-medium text-gray-700 mb-1">不通过原因（必填）</label>
+                    <textarea required name="comment" rows="3" placeholder="请输入不通过的原因，以便用户修改后重新提交..."
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none transition-colors resize-none"></textarea>
                 </div>
                 <button type="submit" class="min-h-[44px] mt-3 w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
