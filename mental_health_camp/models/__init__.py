@@ -7,3 +7,4 @@ from models.batch import Batch
 from models.badge import Badge
 from models.user_badge import UserBadge
 from models.audit_log import AuditLog
+from models.llm_review import LLMConfig, LLMReviewLog

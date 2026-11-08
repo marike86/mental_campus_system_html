@@ -6,10 +6,10 @@ from services.clock import now
 EVENTS = {"创建训练营":"camp.create", "更新训练营":"camp.update", "创建批次":"batch.create", "编辑批次":"batch.update", "删除批次":"batch.delete", "创建用户":"account.create", "创建审核员":"account.create_reviewer", "删除用户":"account.delete", "审批通过加入申请":"enrollment.approve", "拒绝加入申请":"enrollment.reject", "导出数据":"export.generated"}
 
 def record(db, actor_id, action, target_type, target_id=None, detail=None, *, event_type=None, operation_id=None, camp_id=None, batch_id=None):
-    actor=db.get(User,actor_id)
+    actor=db.get(User,actor_id) if actor_id else None
     # Only explicitly approved metadata is retained.
     safe={k:v for k,v in (detail or {}).items() if k in {'status','before','after','version','attempt_id','reviewer_id','assignment_id','count','batch_id','bootcamp_id','role','enrollment_count','deleted','released'}}
-    if camp_id is None:
+    if camp_id is None and target_id:
         if target_type=='bootcamp': camp_id=target_id
         elif target_type=='enrollment':
             from models.enrollment import Enrollment
@@ -29,7 +29,7 @@ def record(db, actor_id, action, target_type, target_id=None, detail=None, *, ev
     for obj,changes in db.info.get('audit_changes',{}).values():
         if getattr(obj,'__tablename__',None)==types.get(target_type) and getattr(obj,'id',None)==target_id:
             safe['changes']=changes
-    item=AuditLog(admin_id=actor_id,action=action,target_type=target_type,target_id=target_id,detail=safe,event_type=event_type or EVENTS.get(action,target_type+'.'+hashlib.sha256(action.encode()).hexdigest()[:12]),actor_role=actor.role if actor else None,operation_id=operation_id,camp_id=camp_id,batch_id=batch_id,created_at=now())
+    item=AuditLog(admin_id=actor_id,action=action,target_type=target_type,target_id=target_id,detail=safe,event_type=event_type or EVENTS.get(action,target_type+'.'+hashlib.sha256(action.encode()).hexdigest()[:12]),actor_role=actor.role if actor else 'system',operation_id=operation_id,camp_id=camp_id,batch_id=batch_id,created_at=now())
     db.add(item)
     db.flush()
     return item

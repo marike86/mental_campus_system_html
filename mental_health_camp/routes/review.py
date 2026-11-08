@@ -66,14 +66,19 @@ async def detail(request: Request, submission_id: int, attempt_id: int=None, rev
         raise HTTPException(404, "提交轮次不存在")
     reviews.authorize_detail(db, sub, attempt, reviewer)
     enrollment = db.get(Enrollment, sub.enrollment_id)
+    if not enrollment:
+        raise HTTPException(404, "报名记录不存在")
     version = db.get(DayFormVersion, attempt.version_id)
+    if not version:
+        raise HTTPException(404, "课程版本不存在")
     answers = decrypt_data(attempt.answers)
     from types import SimpleNamespace
+    bootcamp = db.get(Bootcamp, enrollment.bootcamp_id)
     display = SimpleNamespace(id=sub.id, day_number=sub.day_number, review_status=attempt.review_status,
         submitted_at=attempt.submitted_at, reviewed_at=attempt.reviewed_at, review_comment=attempt.review_comment)
     return templates.TemplateResponse('review/detail.html', dict(request=request, user=reviewer, submission=display,
         attempt=attempt, version=version, is_current=attempt.id==current.id, user_id=enrollment.user_id,
-        bootcamp_name=db.get(Bootcamp,enrollment.bootcamp_id).name,
+        bootcamp_name=bootcamp.name if bootcamp else '未知训练营',
         questions_with_answers=[dict(question=q,answer=answers.get(q['id'],'')) for q in version.questions]))
 
 

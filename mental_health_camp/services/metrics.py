@@ -104,8 +104,9 @@ def statistics(db, camp_id=None, batch_id=None, start=None, end=None):
             actionable_users.add(enrollment.user_id)
         last=last_by_enrollment.get(enrollment.id)
         baseline=local_date(last) if last else enrollment.start_date
+        member=users.get(enrollment.user_id)
         if actionable and baseline and (local_date()-baseline).days>=3:
-            followup.append(dict(enrollment_id=enrollment.id,nickname=users[enrollment.user_id].nickname,
+            followup.append(dict(enrollment_id=enrollment.id,nickname=member.nickname if member else '已注销用户',
                                  last_submitted_at=last.isoformat() if last else None,next_day=actionable['day']))
     records=db.query(ParticipationDay).filter(ParticipationDay.enrollment_id.in_(ids),ParticipationDay.date>=start,ParticipationDay.date<=end).all()
     day_counts=defaultdict(lambda:[set(),set()])

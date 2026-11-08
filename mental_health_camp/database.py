@@ -16,6 +16,7 @@ def get_db():
 def init_db():
     from models import user, bootcamp, day_form, enrollment, submission, batch, badge, user_badge, audit_log, review_assignment
     from models import workflow
+    from models import llm_review
     Base.metadata.create_all(bind=engine)
 
 

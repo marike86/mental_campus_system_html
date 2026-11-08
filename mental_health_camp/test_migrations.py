@@ -41,11 +41,14 @@ def test_legacy_upgrade_idempotence_backup_restore(tmp_path):
     assert result.returncode==0,result.stderr
     assert backup.exists()
     with sqlite3.connect(path) as db:
-        assert db.execute('SELECT version FROM workflow_schema').fetchone()==(3,)
+        assert db.execute('SELECT version FROM workflow_schema').fetchone()==(4,)
         assert db.execute('SELECT count(*) FROM submission_attempts').fetchone()==(1,)
         assert db.execute('SELECT legacy FROM day_form_versions').fetchone()==(1,)
         assert db.execute('SELECT started_at FROM enrollment_days').fetchone()==(None,)
         assert db.execute('SELECT count(*) FROM notifications').fetchone()==(0,)
+        # 大模型审核配置与日志表随迁移一起建立。
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE name='llm_configs'").fetchone()==(1,)
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE name='llm_review_logs'").fetchone()==(1,)
         assert not db.execute('PRAGMA foreign_key_check').fetchall()
         with pytest.raises(sqlite3.IntegrityError):
             db.execute("UPDATE day_form_versions SET questions='[]'")

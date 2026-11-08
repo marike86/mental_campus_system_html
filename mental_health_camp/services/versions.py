@@ -74,9 +74,12 @@ def bound_version(db, enrollment_id, day):
 def submission_questions(db, submission):
     attempt = db.get(SubmissionAttempt, submission.current_attempt_id) if submission.current_attempt_id else None
     if attempt:
-        return db.get(DayFormVersion, attempt.version_id).questions
+        version = db.get(DayFormVersion, attempt.version_id)
+        return version.questions if version else []
     # Only for pre-migration fixtures; production startup rejects unmigrated databases.
     from models.enrollment import Enrollment
     enrollment = db.get(Enrollment, submission.enrollment_id)
+    if not enrollment:
+        return []
     form = db.query(DayForm).filter_by(bootcamp_id=enrollment.bootcamp_id, day_number=submission.day_number).first()
     return form.questions if form else []

@@ -7,6 +7,18 @@ logger = logging.getLogger(__name__)
 # 最小密码长度
 MIN_PASSWORD_LENGTH = 8
 
+# 字段长度上限，防止超长输入撑爆数据库或页面
+MAX_NICKNAME_LENGTH = 50
+MAX_EMAIL_LENGTH = 120
+MAX_FIELD_LENGTH = 100
+
+
+def check_length(value: str, limit: int, label: str) -> tuple:
+    """检查字段长度，返回 (是否通过, 错误提示)。"""
+    if value and len(value) > limit:
+        return False, f"{label}长度不能超过 {limit} 个字符"
+    return True, ""
+
 
 def sanitize_text(value: str) -> str:
     """清理文本输入，防止XSS攻击

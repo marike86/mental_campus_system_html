@@ -24,7 +24,8 @@ from templates_config import templates
 from utils.crypto import decrypt_data
 from services.clock import local_date
 from services.versions import write_lock
-from utils.sanitize import sanitize_text, sanitize_email, validate_password_strength
+from utils.sanitize import (sanitize_text, sanitize_email, validate_password_strength,
+                             check_length, MAX_NICKNAME_LENGTH, MAX_FIELD_LENGTH, MAX_EMAIL_LENGTH)
 from routes.audit import log_admin_action
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,9 @@ async def create_bootcamp(request: Request, admin: User = Depends(require_admin)
     description = form_data.get("description", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="训练营名称不能为空")
+    ok, message = check_length(name, MAX_FIELD_LENGTH, "训练营名称")
+    if not ok:
+        raise HTTPException(status_code=400, detail=message)
     try:
         days = int(form_data.get("days", 7))
     except (TypeError, ValueError):
@@ -526,8 +530,8 @@ async def admin_reset_password(request: Request, admin: User = Depends(require_a
             user_id = int(user_id_str)
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="用户ID必须为数字")
-        if not new_password or len(new_password) < 6:
-            raise HTTPException(status_code=400, detail="新密码长度不能少于6位")
+        if not new_password:
+            raise HTTPException(status_code=400, detail="新密码不能为空")
         pwd_valid, pwd_error = validate_password_strength(new_password)
         if not pwd_valid:
             raise HTTPException(status_code=400, detail=pwd_error)
@@ -603,6 +607,13 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
         college = sanitize_text(college)
         student_id = sanitize_text(student_id)
         grade = sanitize_text(grade)
+        for value, limit, label in ((nickname, MAX_NICKNAME_LENGTH, "昵称"),
+                                    (college, MAX_FIELD_LENGTH, "学院"),
+                                    (student_id, MAX_FIELD_LENGTH, "学号"),
+                                    (grade, MAX_FIELD_LENGTH, "年级")):
+            ok, message = check_length(value, limit, label)
+            if not ok:
+                raise HTTPException(status_code=400, detail=message)
         pwd_valid, pwd_error = validate_password_strength(password)
         if not pwd_valid:
             raise HTTPException(status_code=400, detail=pwd_error)
@@ -610,8 +621,6 @@ async def admin_create_user(request: Request, admin: User = Depends(require_admi
             raise HTTPException(status_code=400, detail="邮箱不能为空")
         if not nickname:
             raise HTTPException(status_code=400, detail="昵称不能为空")
-        if not password or len(password) < 6:
-            raise HTTPException(status_code=400, detail="密码长度不能少于6位")
         # 权限控制：只有超级管理员可以创建admin角色
         if admin.role == "super_admin":
             allowed_roles = ("user", "admin", "reviewer")
@@ -709,6 +718,9 @@ async def admin_edit_user(request: Request, admin: User = Depends(require_admin)
         nickname = sanitize_text(nickname)
         if not nickname:
             raise HTTPException(status_code=400, detail="昵称不能为空")
+        ok, message = check_length(nickname, MAX_NICKNAME_LENGTH, "昵称")
+        if not ok:
+            raise HTTPException(status_code=400, detail=message)
         user.nickname = nickname
         student_id = sanitize_text(form_data.get("student_id", "").strip())
         college = sanitize_text(form_data.get("college", "").strip())

@@ -35,6 +35,7 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@camp.com")  # 初始管理员邮箱
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")   # 初始管理员密码
 ADMIN_NICKNAME = os.getenv("ADMIN_NICKNAME", "管理员")     # 初始管理员昵称
+DEFAULT_ADMIN_PASSWORD = "admin123"                       # 默认口令，仅用于检测未改动的弱口令
 
 # ===== 前端主题配置 =====
 PRIMARY_COLOR = "#9c0c13"            # 主色调（山大红）
@@ -65,7 +66,39 @@ NOTIFICATION_MINUTE = 0              # 每日提醒邮件发送时间（分钟�
 
 # ===== 阶段二：数据加密配置 =====
 ENCRYPTION_KEY = ""                  # Fernet对称加密密钥（base64编码），留空则使用自动生成密钥
-ENCRYPTION_ENABLED = False           # 是否启用答案数据加密（生产环境建议开启）
+ENCRYPTION_ENABLED = os.getenv("ENCRYPTION_ENABLED", "True").lower() == "true"  # 是否启用答案数据加密
+
+# ===== 每日提交限额 =====
+# 每个自然日（北京时间）最多可完成的内容份数；0 表示不限制。
+DAILY_SUBMISSION_LIMIT = int(os.getenv("DAILY_SUBMISSION_LIMIT", "1"))
+
+# ===== 大模型自动审核（OpenAI 兼容接口）默认参数 =====
+LLM_DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL", "gpt-4o-mini")
+LLM_DEFAULT_TIMEOUT = 30             # 单次请求超时（秒）
+LLM_DEFAULT_RETRIES = 1              # 失败重试次数
+LLM_DEFAULT_TEMPERATURE = 0.0        # 采样温度
+LLM_DEFAULT_MAX_TOKENS = 800         # 单次最大生成 token 数
+LLM_MAX_PROMPT_LENGTH = 12000        # 送审文本长度上限，超出截断
+LLM_PROMPT_TEMPLATE = """你是一名心理健康训练营的内容审核助手。请阅读学员提交的表单内容，判断内容是否合适通过，并给出理由。
+
+请只输出一个 JSON 对象，不要输出其他文字，字段如下：
+{"passed": true 或 false, "reason": "审核理由，不超过200字", "risk_level": "low 或 medium 或 high"}
+
+判定标准：
+1. 内容完整、有实质回应，没有空泛敷衍或明显复制粘贴痕迹的，passed 为 true。
+2. 出现明显不友善、攻击、歧视、色情、政治敏感、违法违规内容的，passed 为 false。
+3. 出现自伤、伤人、绝望等高风险表达时，passed 仍为 true，但 risk_level 必须为 high，以便转交人工复核。
+4. risk_level 表示内容风险高低，与是否通过无关；无风险时为 low。
+
+课程：{bootcamp}
+第 {day} 天题目与作答：
+{content}"""            # 审核提示词模板，可在超级管理员页面修改
+
+# ===== 敏感接口限流 =====
+LOGIN_RATE_LIMIT = int(os.getenv("LOGIN_RATE_LIMIT", "10"))       # 单窗口内允许的登录尝试次数
+LOGIN_RATE_WINDOW = int(os.getenv("LOGIN_RATE_WINDOW", "300"))    # 限流窗口（秒）
+REGISTER_RATE_LIMIT = int(os.getenv("REGISTER_RATE_LIMIT", "5"))   # 单窗口内允许的注册次数
+REGISTER_RATE_WINDOW = int(os.getenv("REGISTER_RATE_WINDOW", "3600"))
 
 # ===== 阶段二：成就徽章连续打卡阈值 =====
 BADGE_STREAK_3_DAYS = 3              # 获得"连续3天"徽章所需连续打卡天数

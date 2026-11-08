@@ -1,3 +1,4 @@
+import html
 import smtplib
 import logging
 from email.mime.text import MIMEText
@@ -32,27 +33,41 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
         return False
 
 
-def send_daily_reminder(to_email: str, nickname: str, pending_tasks: list) -> bool:
+def send_daily_reminder(to_email: str, nickname: str, pending_tasks: list, deferred_tasks=None, note: str = '') -> bool:
+    """发送每日打卡提醒；所有可变文本都做 HTML 转义，避免邮件内容注入。"""
+    deferred_tasks = deferred_tasks or []
+    safe_nickname = html.escape(str(nickname or ""), quote=True)
     task_html = ""
     for task in pending_tasks:
+        name = html.escape(str(task.get('bootcamp_name') or ''))
+        url = html.escape(str(task.get('form_url') or ''), quote=True)
+        day = html.escape(str(task.get('day_number') or ''))
         task_html += f"""
         <tr>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">{task['bootcamp_name']}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;">第 {task['day_number']} 天</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;">{name}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #eee;">第 {day} 天</td>
             <td style="padding:8px 12px;border-bottom:1px solid #eee;">
-                <a href="{task['form_url']}" style="color:#6366f1;text-decoration:none;font-weight:bold;">去填写</a>
+                <a href="{url}" style="color:#6366f1;text-decoration:none;font-weight:bold;">去填写</a>
             </td>
         </tr>
         """
-    html = f"""
+    note_html = ""
+    if note:
+        note_html = f'<p style="margin:0 0 12px 0;color:#b45309;">{html.escape(str(note))}</p>'
+    if pending_tasks:
+        summary = f"你还有 <strong>{len(pending_tasks)}</strong> 个训练营表单未完成，快来打卡吧！"
+    else:
+        summary = f"今天的打卡任务已完成，剩余 <strong>{len(deferred_tasks)}</strong> 份内容明天继续。"
+    html_body = f"""
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
         <div style="background:#6366f1;color:white;padding:20px;text-align:center;border-radius:12px 12px 0 0;">
-            <h1 style="margin:0;font-size:20px;">{APP_NAME}</h1>
+            <h1 style="margin:0;font-size:20px;">{html.escape(APP_NAME)}</h1>
             <p style="margin:8px 0 0;opacity:0.9;">每日打卡提醒</p>
         </div>
         <div style="background:#f9fafb;padding:24px;">
-            <p>Hi {nickname}，</p>
-            <p>你还有 <strong>{len(pending_tasks)}</strong> 个训练营表单未完成，快来打卡吧！</p>
+            <p>Hi {safe_nickname}，</p>
+            <p>{summary}</p>
+            {note_html}
             <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;margin:16px 0;">
                 <tr style="background:#f3f4f6;">
                     <td style="padding:8px 12px;font-weight:bold;font-size:13px;">训练营</td>
@@ -68,4 +83,4 @@ def send_daily_reminder(to_email: str, nickname: str, pending_tasks: list) -> bo
     </div>
     """
     subject = f"【{APP_NAME}】今日还有未完成的打卡任务"
-    return send_email(to_email, subject, html)
+    return send_email(to_email, subject, html_body)

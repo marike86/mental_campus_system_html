@@ -104,7 +104,9 @@ def test_full_flow_http_and_immutable_rounds(world):
     assert w.client.post(f'/review/{sub.id}/reject',data=dict(attempt_id=second,comment='改判'),follow_redirects=False).status_code==409
     login(w,w.user)
     data=w.client.get(f'/user/api/progress/{w.enrollment.id}').json()
-    assert data['days'][0]['status']=='approved' and data['days'][1]['actionable']
+    assert data['days'][0]['status']=='approved'
+    # 每日限额：当天已完成一份内容后，其余内容要等自然日切换。
+    assert not data['days'][1]['actionable'] and '今日已完成' in data['days'][1]['reason']
     history=w.client.get(f'/user/history/{w.enrollment.id}').text
     assert '第一次' in history and '第二次' in history and '请补充细节' in history
 
@@ -149,6 +151,10 @@ def test_dual_unlock_makeup_and_missing_version(world):
     w.enrollment.start_date=local_date();w.db.commit()
     with pytest.raises(HTTPException):courses.start(w.db,w.enrollment,2)
     w.enrollment.start_date=local_date()-timedelta(days=10);w.db.commit()
+    # 每日限额：当天已完成一份内容，补交的第 2 天要等到下一个自然日。
+    with pytest.raises(HTTPException):courses.start(w.db,w.enrollment,2)
+    attempt=w.db.get(SubmissionAttempt,sub.current_attempt_id)
+    attempt.submitted_at=now()-timedelta(days=1);w.db.commit()
     assert courses.start(w.db,w.enrollment,2)
 
 

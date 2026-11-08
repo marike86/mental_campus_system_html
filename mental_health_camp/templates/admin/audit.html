@@ -29,7 +29,7 @@
                             {{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}
                         </td>
                         <td class="px-6 py-4">
-                            <span class="text-sm font-medium text-gray-900">{{ admin_map.get(log.admin_id, '未知') }}</span>
+                            <span class="text-sm font-medium text-gray-900">{{ admin_map.get(log.admin_id) or '系统自动' }}</span>
                         </td>
                         <td class="px-6 py-4">
                             <span class="break-all whitespace-normal inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
@@ -64,7 +64,7 @@
                     <span class="text-sm font-medium text-gray-900">{{ log.action }} · {{log.event_type or "暂无数据"}} · {{log.actor_role or "暂无数据"}} · {{log.operation_id or ""}}</span>
                     <span class="text-xs text-gray-400">{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '' }}</span>
                 </div>
-                <p class="text-xs text-gray-500">{{ admin_map.get(log.admin_id, '未知') }} · {{ log.target_type }} {{ '#' ~ log.target_id if log.target_id else '' }}</p>
+                <p class="text-xs text-gray-500">{{ admin_map.get(log.admin_id) or '系统自动' }} · {{ log.target_type }} {{ '#' ~ log.target_id if log.target_id else '' }}</p>
             </div>
             {% endfor %}
         </div>

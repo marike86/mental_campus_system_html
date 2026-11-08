@@ -7,9 +7,10 @@ from sqlalchemy import inspect, text
 from database import engine, Base, SessionLocal
 from models import user, bootcamp, day_form, enrollment, submission, batch, badge, user_badge, audit_log, review_assignment
 from models.workflow import WorkflowSchema, DayFormVersion, EnrollmentDay, SubmissionAttempt
+from models import llm_review
 from services.clock import now
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def preflight(connection):
@@ -28,6 +29,44 @@ def preflight(connection):
             problems += [f"{table} 孤立记录 ID: {r[0]}" for r in rows]
     if problems:
         raise RuntimeError("\n".join(problems))
+
+
+def _make_audit_actor_nullable(connection):
+    """audit_logs.admin_id 允许为空，用于记录大模型等系统自动操作。"""
+    columns = {c['name'] for c in inspect(connection).get_columns('audit_logs')}
+    if 'admin_id' not in columns:
+        return
+    admin_column = next(c for c in inspect(connection).get_columns('audit_logs') if c['name'] == 'admin_id')
+    if admin_column.get('nullable', True):
+        return
+    connection.execute(text("""
+        CREATE TABLE audit_logs_new (
+            id INTEGER NOT NULL,
+            admin_id INTEGER,
+            action VARCHAR NOT NULL,
+            target_type VARCHAR NOT NULL,
+            target_id INTEGER,
+            detail JSON,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            event_type VARCHAR,
+            actor_role VARCHAR,
+            operation_id VARCHAR,
+            camp_id INTEGER,
+            batch_id INTEGER,
+            PRIMARY KEY (id),
+            FOREIGN KEY(admin_id) REFERENCES users (id)
+        )"""))
+    connection.execute(text("""INSERT INTO audit_logs_new
+        (id, admin_id, action, target_type, target_id, detail, created_at,
+         event_type, actor_role, operation_id, camp_id, batch_id)
+        SELECT id, admin_id, action, target_type, target_id, detail, created_at,
+               event_type, actor_role, operation_id, camp_id, batch_id
+        FROM audit_logs"""))
+    connection.execute(text("DROP TABLE audit_logs"))
+    connection.execute(text("ALTER TABLE audit_logs_new RENAME TO audit_logs"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_logs_id ON audit_logs (id)"))
+    for column in ("event_type", "operation_id", "camp_id", "batch_id"):
+        connection.execute(text(f"CREATE INDEX IF NOT EXISTS ix_audit_logs_{column} ON audit_logs({column})"))
 
 
 def migrate(backup_path=None):
@@ -68,6 +107,7 @@ def migrate(backup_path=None):
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_day ON submissions(enrollment_id,day_number)"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_enrollment_camp ON enrollments(user_id,bootcamp_id)"))
         connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_day_form ON day_forms(bootcamp_id,day_number)"))
+        _make_audit_actor_nullable(connection)
     with SessionLocal() as db:
         versions = {}
         for form in db.query(day_form.DayForm).all():

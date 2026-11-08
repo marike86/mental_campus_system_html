@@ -40,7 +40,7 @@ async def audit_log_page(request: Request, page: int = 1, admin: User = Depends(
     page = max(1, min(page, total_pages))
     offset = (page - 1) * ITEMS_PER_PAGE
     logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(ITEMS_PER_PAGE).all()
-    admin_ids = {l.admin_id for l in logs}
+    admin_ids = {l.admin_id for l in logs if l.admin_id}
     admin_map = {}
     admin_map = {u.id:u.nickname for u in db.query(User).filter(User.id.in_(admin_ids))}
     return templates.TemplateResponse("admin/audit.html", {

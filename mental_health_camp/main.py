@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from database import init_db, get_db
-from config import APP_NAME, APP_DESCRIPTION, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NICKNAME, NOTIFICATION_HOUR, NOTIFICATION_MINUTE, DEBUG
+from config import APP_NAME, APP_DESCRIPTION, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NICKNAME, DEFAULT_ADMIN_PASSWORD, NOTIFICATION_HOUR, NOTIFICATION_MINUTE, DEBUG
 from templates_config import templates
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -35,6 +35,8 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    if not DEBUG:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "
@@ -143,6 +145,13 @@ def _create_admin_if_needed():
     try:
         existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()
         if not existing:
+            if ADMIN_PASSWORD == DEFAULT_ADMIN_PASSWORD:
+                message = ("初始管理员仍在使用默认口令 admin123，请在生产环境通过 ADMIN_PASSWORD "
+                           "环境变量设置强密码后重新初始化账号。")
+                if not DEBUG:
+                    # 生产环境拒绝以默认口令创建管理员。
+                    raise RuntimeError(message)
+                logger.warning(message)
             pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
             admin = User(
                 email=ADMIN_EMAIL,

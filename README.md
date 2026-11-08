@@ -36,6 +36,7 @@
 | 注册/登录 | 邮箱注册，JWT Cookie 认证，支持用户信息管理 |
 | 训练营浏览 | 查看可参加的训练营列表，支持一键加入 |
 | 每日打卡 | 填写 Likert 量表心理评估表单，支持多种题型 |
+| 每日限额 | 每个自然日最多完成 1 份内容，跨天自动重置；页面显示当日完成份数 |
 | 打卡历史 | 查看历史提交记录，追踪个人成长轨迹 |
 | 成就徽章 | 根据打卡行为自动获得徽章（首次打卡、连续3天、连续7天、训练营毕业） |
 | 数据仪表盘 | 可视化展示打卡数据、连续天数、Likert 趋势图 |
@@ -54,6 +55,7 @@
 | 审计日志 | 记录所有管理员操作，支持查看详情 |
 | 数据导出 | 按训练营导出用户提交数据为 CSV 格式 |
 | 审核员管理 | 创建/管理审核员账号，支持审核任务分配和统计 |
+| AI 自动审核 | 超级管理员配置 OpenAI 兼容接口与提示词，由大模型自动审核提交内容，接口异常自动转人工 |
 
 ### 审核员功能
 
@@ -193,8 +195,37 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 | 环境变量 | 说明 | 默认值 |
 |----------|------|--------|
-| `ENCRYPTION_ENABLED` | 是否启用数据加密 | `False` |
-| `ENCRYPTION_KEY` | Fernet 加密密钥 | 自动生成 |
+| `ENCRYPTION_ENABLED` | 是否启用数据加密（答案、凭据） | `True` |
+| `ENCRYPTION_KEY` | Fernet 加密密钥 | 自动生成并存入 `.encryption_key` |
+
+> 加密密钥文件 `.encryption_key` 与数据库同等重要，必须随数据库一起备份，且不可提交到仓库。
+
+#### 每日提交限额配置
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `DAILY_SUBMISSION_LIMIT` | 每个自然日最多完成的内容份数，0 表示不限制 | `1` |
+
+#### 大模型自动审核配置
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `LLM_DEFAULT_MODEL` | 默认模型名称（页面可改） | `gpt-4o-mini` |
+
+接口地址、API Key、模型、超时、重试、温度、最大 token 与审核提示词全部在
+**超级管理员 → AI 自动审核**（`/super-admin/ai-settings`）页面配置并持久化到数据库。
+API Key 使用 Fernet 加密后存储，前端只展示脱敏值，请求由服务端代理转发。
+
+#### 敏感接口限流配置
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `LOGIN_RATE_LIMIT` | 单窗口内允许的登录尝试次数 | `10` |
+| `LOGIN_RATE_WINDOW` | 登录限流窗口（秒） | `300` |
+| `REGISTER_RATE_LIMIT` | 单窗口内允许的注册次数 | `5` |
+| `REGISTER_RATE_WINDOW` | 注册限流窗口（秒） | `3600` |
+
+> 限流仅在 `DEBUG=False`（生产模式）下生效，调试模式不拦截以免影响本地开发。
 
 ### 生成密钥
 
@@ -292,6 +323,7 @@ jianxin_system/
     │   ├── badge.py             # 徽章模型
     │   ├── user_badge.py        # 用户徽章模型
     │   ├── audit_log.py         # 审计日志模型
+    │   ├── llm_review.py        # 大模型审核配置与日志模型
     │   └── review_assignment.py # 审核任务分配模型
     ├── routes/                  # 路由模块
     │   ├── __init__.py
@@ -302,11 +334,15 @@ jianxin_system/
     │   ├── audit.py             # 审计日志路由
     │   ├── notification.py      # 邮件通知路由
     │   ├── review.py            # 审核路由
+    │   ├── llm_settings.py      # 大模型自动审核配置路由
     │   └── reviewer_management.py # 审核员管理路由
     ├── utils/                   # 工具模块
     │   ├── __init__.py
     │   ├── email.py             # 邮件发送工具
-    │   └── crypto.py            # 数据加密工具
+    │   ├── crypto.py            # 数据加密工具
+    │   ├── csrf.py              # CSRF 校验工具
+    │   ├── ratelimit.py         # 敏感接口限流工具
+    │   └── sanitize.py          # 输入清洗与校验工具
     ├── templates/               # HTML 模板
     │   ├── base.html            # 基础布局模板
     │   ├── index.html           # 首页

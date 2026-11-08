@@ -2298,10 +2298,25 @@ class TestCryptoUtils:
         assert decrypted == data
 
     def test_encrypt_data_returns_json_string(self):
+        """默认开启加密：密文不再是明文 JSON，但仍可正确解密。"""
         data = {"key": "value"}
         result = encrypt_data(data)
-        parsed = json.loads(result)
-        assert parsed == data
+        assert result != json.dumps(data, ensure_ascii=False)
+        assert decrypt_data(result) == data
+
+    def test_decrypt_legacy_plaintext_json(self):
+        """加密前写入的历史明文数据仍可读取。"""
+        assert decrypt_data(json.dumps({"key": "value"}, ensure_ascii=False)) == {"key": "value"}
+
+    def test_secret_roundtrip_is_encrypted(self):
+        """凭据加密后可还原，且密文不包含原文。"""
+        from utils.crypto import encrypt_secret, decrypt_secret
+        secret = "sk-test-1234567890"
+        encrypted = encrypt_secret(secret)
+        assert secret not in encrypted
+        assert decrypt_secret(encrypted) == secret
+        assert decrypt_secret("") == ""
+        assert decrypt_secret("not-a-valid-token") == ""
 
     def test_decrypt_data_invalid_json(self):
         result = decrypt_data("not json at all")

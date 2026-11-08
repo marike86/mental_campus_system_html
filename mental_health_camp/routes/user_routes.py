@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
@@ -15,11 +15,11 @@ from auth import get_current_user, get_password_hash, verify_password, verify_cs
 from config import APP_NAME
 from templates_config import templates
 from utils.crypto import encrypt_data, decrypt_data
-from utils.sanitize import sanitize_text, validate_password_strength
+from utils.sanitize import sanitize_text, validate_password_strength, check_length, MAX_NICKNAME_LENGTH
 
 from types import SimpleNamespace
 from services.clock import local_date
-from services import courses
+from services import courses, llm
 from services.versions import bound_version, submission_questions
 from models.workflow import SubmissionAttempt, DayFormVersion
 import logging
@@ -52,14 +52,16 @@ async def today_tasks(request: Request, current_user: User = Depends(get_current
     for enrollment in enrollments:
         camp, items = courses.progress(db, enrollment)
         groups.append(dict(enrollment=enrollment, camp=camp, items=[x for x in items if x['status'] != 'approved']))
-    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=groups))
+    daily = courses.daily_state_for_user(db, current_user.id)
+    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=groups, daily=daily))
 
 
 @router.get("/course/{enrollment_id}")
 async def course_overview(request: Request, enrollment_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
     camp, items = courses.progress(db, enrollment)
-    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=[dict(enrollment=enrollment, camp=camp, items=items)]))
+    daily = courses.daily_state_for_user(db, current_user.id)
+    return templates.TemplateResponse("user/courses.html", dict(request=request, user=current_user, groups=[dict(enrollment=enrollment, camp=camp, items=items)], daily=daily))
 
 
 @router.get("/api/progress/{enrollment_id}")
@@ -113,24 +115,28 @@ async def fill_form(request: Request, enrollment_id: int, day: int, current_user
 
 
 @router.post("/form/{enrollment_id}/{day}")
-async def submit_form(request: Request, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
+async def submit_form(request: Request, background_tasks: BackgroundTasks, enrollment_id: int, day: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), _csrf: None = Depends(verify_csrf)):
     enrollment = courses.owned_enrollment(db, current_user.id, enrollment_id)
     form = await request.form()
     try:
         submission = courses.submit(db, enrollment, day, form)
     except HTTPException as exc:
-        if exc.status_code != 400:
+        if exc.status_code not in (400, 409):
             raise
         db.rollback()
         context = form_context(db, enrollment, day, current_user, request)
+        version = context.get('version')
         answers = {}
-        for q in context['version'].questions:
+        for q in (version.questions if version else []):
             key='q_'+q['id']
             answers[q['id']] = form.getlist(key) if q['type']=='multiple' else form.get(key,'')
         context.update(existing=SimpleNamespace(answers=answers,review_status='rejected',review_comment=''),can_edit=True,error=exc.detail)
-        reading=any(q['type']=='reading' for q in context['version'].questions)
-        return templates.TemplateResponse('user/camp_content.html' if reading else 'user/form.html',context,status_code=400)
+        reading=bool(version) and any(q['type']=='reading' for q in version.questions)
+        return templates.TemplateResponse('user/camp_content.html' if reading else 'user/form.html',context,status_code=exc.status_code)
     db.commit()
+    if submission.current_attempt_id:
+        # 大模型审核放在后台执行：接口不可用时自动转人工审核，不阻塞学员提交。
+        background_tasks.add_task(llm.review_attempt_background, submission.id, submission.current_attempt_id)
     return RedirectResponse(f"/user/history/{enrollment_id}?submitted_day={day}&submitted_attempt={submission.current_attempt_id}", 303)
 
 
@@ -233,6 +239,10 @@ async def history(request: Request, enrollment_id: int, current_user: User = Dep
     for sub in submissions:
         for attempt in db.query(SubmissionAttempt).filter_by(submission_id=sub.id).order_by(SubmissionAttempt.round_number):
             version = db.get(DayFormVersion, attempt.version_id)
+            if not version:
+                # 课程版本缺失属于数据异常，跳过以免整页 500。
+                logger.warning("提交轮次 %s 的课程版本 %s 不存在，已在历史页跳过", attempt.id, attempt.version_id)
+                continue
             record = dict(id=sub.id, day_number=sub.day_number, submitted_at=attempt.submitted_at,
                           answers=decrypt_data(attempt.answers), review_status=attempt.review_status,
                           review_comment=attempt.review_comment, round_number=attempt.round_number, version=version.version,
@@ -265,6 +275,11 @@ async def update_profile(request: Request, nickname: str = Form(...), current_us
     nickname = sanitize_text(nickname)
     if not nickname:
         return RedirectResponse("/user/profile", status_code=302)
+    ok, message = check_length(nickname, MAX_NICKNAME_LENGTH, "昵称")
+    if not ok:
+        return templates.TemplateResponse("user/dashboard.html", {
+            "request": request, "user": current_user, "app_name": APP_NAME, "show_profile": True, "pwd_error": message,
+        })
     current_user.nickname = nickname
     db.commit()
     return RedirectResponse("/user/profile", status_code=302)

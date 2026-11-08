@@ -15,6 +15,7 @@ from templates_config import templates
 from routes.audit import log_admin_action
 from services import reviews
 from services.versions import write_lock
+from utils.sanitize import validate_password_strength
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +91,10 @@ async def create_reviewer(request: Request, admin: User = Depends(require_super_
             raise HTTPException(status_code=400, detail="邮箱不能为空")
         if not nickname:
             raise HTTPException(status_code=400, detail="昵称不能为空")
-        if not password or len(password) < 6:
-            raise HTTPException(status_code=400, detail="密码长度不能少于6位")
+        # 与注册、修改密码保持同一套强度规则，避免弱口令账号。
+        pwd_valid, pwd_error = validate_password_strength(password)
+        if not pwd_valid:
+            raise HTTPException(status_code=400, detail=pwd_error)
         
         try:
             max_concurrent_tasks = int(max_concurrent_tasks_str)
@@ -214,7 +217,10 @@ async def update_reviewer(request: Request, reviewer_id: int, admin: User = Depe
         reviewer.specialty = specialty or None
         reviewer.max_concurrent_tasks = max_concurrent_tasks
         
-        if new_password and len(new_password) >= 6:
+        if new_password:
+            pwd_valid, pwd_error = validate_password_strength(new_password)
+            if not pwd_valid:
+                raise HTTPException(status_code=400, detail=pwd_error)
             reviewer.hashed_password = get_password_hash(new_password)
         
         db.flush()

@@ -9,8 +9,10 @@ from models.workflow import EnrollmentDay, DayFormVersion, SubmissionAttempt
 from services.clock import now, local_date
 from services.versions import bound_version, latest_version, write_lock
 from utils.crypto import encrypt_data
+from config import DAILY_SUBMISSION_LIMIT
 
 LABELS = dict(future="未开始", locked="已锁定", available="可学习", pending="待审核", rejected="需修改", approved="已完成")
+DAILY_LIMIT_REASON = "今日已完成一份内容，明天再来继续"
 
 
 def owned_enrollment(db, user_id, enrollment_id):
@@ -20,7 +22,7 @@ def owned_enrollment(db, user_id, enrollment_id):
     return enrollment
 
 
-def states(enrollment, camp, submissions, published_days, today=None):
+def states(enrollment, camp, submissions, published_days, today=None, daily=None):
     today = today or local_date()
     result = []
     blocked = "训练营已停用" if not camp.is_active else "报名尚未批准" if enrollment.status != "approved" else "尚未设置开课日期" if not enrollment.start_date else ""
@@ -43,9 +45,64 @@ def states(enrollment, camp, submissions, published_days, today=None):
         if status == "rejected" and scheduled and scheduled > today:
             reason = reason or "尚未到计划日期"
         actionable = status in ("available", "rejected") and not reason
+        daily_blocked = False
+        if actionable and daily and daily.get("exhausted"):
+            # 同一份内容当天重提不算新的一份，因此只拦截尚未提交过的内容。
+            if sub is None or sub.id not in daily.get("ids", ()):
+                reason = daily.get("reason") or DAILY_LIMIT_REASON
+                actionable = False
+                daily_blocked = True
         result.append(dict(day=day, status=status, label=LABELS[status], scheduled_date=scheduled.isoformat() if scheduled else None,
-                           reason=reason, actionable=actionable, url=f"/user/form/{enrollment.id}/{day}"))
+                           reason=reason, actionable=actionable, daily_blocked=daily_blocked,
+                           url=f"/user/form/{enrollment.id}/{day}"))
     return result
+
+
+def daily_progress(db, user_id, today=None):
+    """今日已提交的内容份数与对应提交 ID 集合（按北京时间自然日统计，跨天自动重置）。"""
+    today = today or local_date()
+    enrollments = [row.id for row in db.query(Enrollment).filter_by(user_id=user_id).all()]
+    if not enrollments:
+        return 0, set()
+    rows = db.query(SubmissionAttempt.submission_id, SubmissionAttempt.submitted_at).join(
+        Submission, Submission.id == SubmissionAttempt.submission_id
+    ).filter(Submission.enrollment_id.in_(enrollments)).all()
+    ids = {row.submission_id for row in rows if local_date(row.submitted_at) == today}
+    return len(ids), ids
+
+
+def daily_state_for_user(db, user_id, today=None):
+    """每日配额状态（按用户统计，跨训练营共享同一份额）。"""
+    limit = DAILY_SUBMISSION_LIMIT
+    if limit <= 0:
+        return {"limit": 0, "used": 0, "ids": set(), "exhausted": False, "reason": ""}
+    used, ids = daily_progress(db, user_id, today)
+    exhausted = used >= limit
+    return {
+        "limit": limit,
+        "used": used,
+        "ids": ids,
+        "exhausted": exhausted,
+        "reason": f"今日已完成 {used} 份内容，每天最多完成 {limit} 份，明天再来继续" if exhausted else "",
+    }
+
+
+def daily_state(db, enrollment, today=None):
+    """每日配额状态，供课程页展示与状态判定使用。"""
+    return daily_state_for_user(db, enrollment.user_id, today)
+
+
+def check_daily_limit(db, user_id, submission_id=None):
+    """每个自然日最多完成 DAILY_SUBMISSION_LIMIT 份内容。"""
+    limit = DAILY_SUBMISSION_LIMIT
+    if limit <= 0:
+        return
+    used, ids = daily_progress(db, user_id)
+    if used < limit:
+        return
+    if submission_id is not None and submission_id in ids:
+        return  # 同一份内容的重提不占用新名额
+    raise HTTPException(409, f"今天已经完成 {used} 份内容，每天最多完成 {limit} 份，明天再来继续")
 
 
 def progress(db, enrollment):
@@ -55,7 +112,7 @@ def progress(db, enrollment):
     subs = {s.day_number:s for s in db.query(Submission).filter_by(enrollment_id=enrollment.id)}
     published = {d.day_number for d in db.query(DayForm).join(DayFormVersion, DayFormVersion.day_form_id==DayForm.id).filter(DayForm.bootcamp_id==camp.id, DayFormVersion.questions != "[]")}
     published.update(d.day_number for d in db.query(EnrollmentDay).filter_by(enrollment_id=enrollment.id))
-    return camp, states(enrollment, camp, subs, published)
+    return camp, states(enrollment, camp, subs, published, daily=daily_state(db, enrollment))
 
 
 def can_work(db, enrollment, day):
@@ -124,6 +181,7 @@ def submit(db, enrollment, day, form):
         raise HTTPException(409, "课程版本不匹配，请重新打开课程")
     answers = parse_answers(version.questions, form)
     sub = db.query(Submission).filter_by(enrollment_id=enrollment.id, day_number=day).first()
+    check_daily_limit(db, enrollment.user_id, sub.id if sub else None)
     if not sub:
         sub = Submission(enrollment_id=enrollment.id, day_number=day, answers='{}', review_status='pending')
         db.add(sub)
